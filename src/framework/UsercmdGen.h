@@ -36,6 +36,7 @@ const int BUTTON_VOICECHAT		= BIT(6);
 const int BUTTON_TOURNEY		= BIT(7);
 // twhitaker: strafe
 const int BUTTON_STRAFE			= BIT(8);
+const int BUTTON_WEAPONWHEEL	= BIT(9);
 // RAVEN END
 
 

@@ -935,6 +935,14 @@ private:
 	// full screen guis track mouse movements directly
 	int						oldMouseX;
 	int						oldMouseY;
+	bool					weaponWheelActive;
+	int						weaponWheelHoveredSlot;
+	int						weaponWheelLastMouseX;
+	int						weaponWheelLastMouseY;
+	int						weaponWheelLastUpdateTime;
+	float					weaponWheelBlend;
+	float					weaponWheelBaseTimescale;
+	idVec2					weaponWheelCursor;
 
 	bool					tipUp;
 	bool					objectiveUp;
@@ -1017,8 +1025,19 @@ private:
 	void					PredictionErrorDecay( void );
 
 	bool					CanZoom(void);
+	bool					CanUseWeaponWheel( void );
 
 	void					LookAtKiller( idEntity *inflictor, idEntity *attacker );
+	void					ApplyWeaponWheelInputMask( void );
+	void					ResetWeaponWheel( bool instantRestore = false );
+	void					UpdateWeaponWheel( void );
+	void					UpdateWeaponWheelEffects( void );
+	void					UpdateWeaponWheelCursor( void );
+	void					DrawWeaponWheel( void );
+	int						GetWeaponWheelSlotForWeapon( int weaponIndex ) const;
+	int						GetWeaponWheelWeaponForSlot( int slot ) const;
+	int						GetWeaponWheelAmmoCount( int weaponIndex );
+	bool					IsWeaponWheelSlotLowAmmo( int slot );
 
 	void					StopFiring( void );
 	void					FireWeapon( void );

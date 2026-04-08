@@ -928,23 +928,48 @@ int idPush::TryTranslatePushEntity( trace_t &results, idEntity *check, idClipMod
 	else {
 		// move entity in reverse only colliding with pusher
 		ClipEntityTranslation( results, check, clipModel, NULL, -move );
-		// if no collision with the pusher then the entity is not pushed by the pusher
+		// If the entity is hovering just above a fast-rising pusher, the reverse trace can
+		// miss the contact even though the pusher's final position would overlap it.
 		if ( results.fraction >= 1.0f ) {
-			return PUSH_NO;
+			const idVec3 oldClipOrigin = clipModel->GetOrigin();
+			const idMat3 clipAxis = clipModel->GetAxis();
+
+			clipModel->Link( clipModel->GetEntity(), clipModel->GetId(), newOrigin, clipAxis );
+			const bool overlapsAtDestination = physics->ClipContents( clipModel );
+			clipModel->Link( clipModel->GetEntity(), clipModel->GetId(), oldClipOrigin, clipAxis );
+
+			// if no collision with the pusher then the entity is not pushed by the pusher
+			if ( !overlapsAtDestination ) {
+				return PUSH_NO;
+			}
+
+			ClipEntityTranslation( trace, check, NULL, clipModel, move );
+			if ( trace.fraction < 1.0f ) {
+				checkMove = move * trace.fraction;
+				ClipEntityTranslation( results, check, clipModel, NULL, -( move - checkMove ) );
+				if ( results.fraction < 1.0f ) {
+					results.c.normal = -results.c.normal;
+					results.c.dist = -results.c.dist;
+					return PUSH_BLOCKED;
+				}
+			} else {
+				checkMove = move;
+			}
 		}
-		// vector along which the entity is pushed
-		checkMove = move * (1.0f - results.fraction);
-		// move the entity colliding with all other entities except the pusher itself
-		ClipEntityTranslation( trace, check, NULL, clipModel, checkMove );
-		// if there is a collisions
-		if ( trace.fraction < 1.0f ) {
+		else {
+			// vector along which the entity is pushed
+			checkMove = move * (1.0f - results.fraction);
+			// move the entity colliding with all other entities except the pusher itself
+			ClipEntityTranslation( trace, check, NULL, clipModel, checkMove );
+			// if there is a collisions
+			if ( trace.fraction < 1.0f ) {
 
-			results.c.normal = -results.c.normal;
-			results.c.dist = -results.c.dist;
+				results.c.normal = -results.c.normal;
+				results.c.dist = -results.c.dist;
 
-			// FIXME: try to push the blocking entity as well ?
-			// FIXME: handle sliding along more than one collision plane ?
-			// FIXME: this code has issues, player pushing box into corner in "maps/mre/aaron/test.map"
+				// FIXME: try to push the blocking entity as well ?
+				// FIXME: handle sliding along more than one collision plane ?
+				// FIXME: this code has issues, player pushing box into corner in "maps/mre/aaron/test.map"
 
 /*
 			oldOrigin = physics->GetOrigin();
@@ -975,8 +1000,9 @@ int idPush::TryTranslatePushEntity( trace_t &results, idEntity *check, idClipMod
 
 			physics->SetOrigin( oldOrigin );
 */
-			if ( trace.fraction < 1.0f ) {
-				return PUSH_BLOCKED;
+				if ( trace.fraction < 1.0f ) {
+					return PUSH_BLOCKED;
+				}
 			}
 		}
 	}

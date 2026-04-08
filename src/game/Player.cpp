@@ -79,6 +79,215 @@ const int	MAX_INVENTORY_ITEMS = 20;
 
 const int	ARENA_POWERUP_MASK = ( 1 << POWERUP_AMMOREGEN ) | ( 1 << POWERUP_GUARD ) | ( 1 << POWERUP_DOUBLER ) | ( 1 << POWERUP_SCOUT );
 
+namespace {
+const int	WEAPON_WHEEL_SLOT_COUNT			= 12;
+const int	WEAPON_WHEEL_WEDGE_SUBDIVISIONS	= 8;
+
+const float	WEAPON_WHEEL_CENTER_X			= SCREEN_WIDTH * 0.77f;
+const float	WEAPON_WHEEL_CENTER_Y			= SCREEN_HEIGHT * 0.50f;
+const float	WEAPON_WHEEL_INNER_RADIUS		= 54.0f;
+const float	WEAPON_WHEEL_OUTER_RADIUS		= 122.0f;
+const float	WEAPON_WHEEL_CURSOR_RADIUS		= 118.0f;
+const float	WEAPON_WHEEL_DEADZONE_RADIUS	= 24.0f;
+const float	WEAPON_WHEEL_CARD_WIDTH			= 88.0f;
+const float	WEAPON_WHEEL_CARD_HEIGHT		= 54.0f;
+const float	WEAPON_WHEEL_CARD_SHIFT_X		= -18.0f;
+const float	WEAPON_WHEEL_CARD_SHIFT_Y		= -8.0f;
+const float	WEAPON_WHEEL_ICON_SIZE			= 42.0f;
+const float	WEAPON_WHEEL_SLOT_ICON_SIZE		= 48.0f;
+const float	WEAPON_WHEEL_CURSOR_SIZE		= 9.0f;
+const float	WEAPON_WHEEL_LINE_THICKNESS		= 2.0f;
+const float	WEAPON_WHEEL_MOUSE_SENSITIVITY	= 0.70f;
+const float	WEAPON_WHEEL_TIMESCALE_SCALE	= 0.18f;
+const float	WEAPON_WHEEL_BLEND_IN_SPEED		= 8.0f;
+const float	WEAPON_WHEEL_BLEND_OUT_SPEED	= 9.0f;
+const float	WEAPON_WHEEL_ARROW_OFFSET		= 83.0f;
+const float	WEAPON_WHEEL_ARROW_LENGTH		= 18.0f;
+const float	WEAPON_WHEEL_ARROW_HALF_WIDTH	= 7.5f;
+const float	WEAPON_WHEEL_COUNT_RADIUS		= 104.0f;
+const float	WEAPON_WHEEL_CENTER_TEXT_SCALE	= 0.54f;
+const float	WEAPON_WHEEL_CENTER_TEXT_WIDTH	= WEAPON_WHEEL_INNER_RADIUS * 1.65f;
+const float	WEAPON_WHEEL_CENTER_TEXT_GAP	= 2.0f;
+
+const int weaponWheelSlotWeapons[ WEAPON_WHEEL_SLOT_COUNT ] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, -1 };
+
+const char* const weaponWheelOverlayMaterials[ 3 ] = {
+	"weaponwheel/wedge_normal",
+	"weaponwheel/wedge_lowammo",
+	"weaponwheel/wedge_missing"
+};
+
+static float WeaponWheelLerp( float a, float b, float t ) {
+	return a + ( b - a ) * t;
+}
+
+static idVec2 WeaponWheelDirection( float angle ) {
+	return idVec2( idMath::Sin( angle ), -idMath::Cos( angle ) );
+}
+
+static float WeaponWheelGetAspectScale( void ) {
+	const float baseAspect = static_cast<float>( SCREEN_WIDTH ) / static_cast<float>( SCREEN_HEIGHT );
+	const float currentAspect = idMath::ClampFloat( 0.1f, 10.0f, gameLocal.GetScreenAspectRatio() );
+	return baseAspect / currentAspect;
+}
+
+static idVec2 WeaponWheelProjectPoint( const idVec2& center, const idVec2& localPoint, float aspectScale ) {
+	return idVec2( center.x + localPoint.x * aspectScale, center.y + localPoint.y );
+}
+
+static void DrawWeaponWheelQuad( const idVec2& p0, const idVec2& p1, const idVec2& p2, const idVec2& p3, const idMaterial* material ) {
+	if ( material == NULL ) {
+		return;
+	}
+
+	renderSystem->DrawStretchTri( p0, p1, p2, idVec2( 0.0f, 0.0f ), idVec2( 1.0f, 0.0f ), idVec2( 1.0f, 1.0f ), material );
+	renderSystem->DrawStretchTri( p0, p2, p3, idVec2( 0.0f, 0.0f ), idVec2( 1.0f, 1.0f ), idVec2( 0.0f, 1.0f ), material );
+}
+
+static void DrawWeaponWheelLine( const idVec2& center, const idVec2& from, const idVec2& to, float halfWidth, float aspectScale, const idMaterial* material ) {
+	idVec2 dir = to - from;
+	float length = dir.Length();
+	if ( length <= 0.0f || material == NULL ) {
+		return;
+	}
+
+	dir *= ( 1.0f / length );
+	const idVec2 perp( -dir.y, dir.x );
+	const idVec2 p0 = WeaponWheelProjectPoint( center, from + perp * halfWidth, aspectScale );
+	const idVec2 p1 = WeaponWheelProjectPoint( center, to + perp * halfWidth, aspectScale );
+	const idVec2 p2 = WeaponWheelProjectPoint( center, to - perp * halfWidth, aspectScale );
+	const idVec2 p3 = WeaponWheelProjectPoint( center, from - perp * halfWidth, aspectScale );
+	DrawWeaponWheelQuad( p0, p1, p2, p3, material );
+}
+
+static float WeaponWheelStringWidth( const char* string, float aspectScale, float textScale ) {
+	if ( string == NULL ) {
+		return 0.0f;
+	}
+
+	float width = 0.0f;
+	for ( const char* s = string; *s != '\0'; ++s ) {
+		width += BIGCHAR_WIDTH * aspectScale * textScale;
+	}
+
+	return width;
+}
+
+static void DrawWeaponWheelString( float x, float y, const char* string, const idVec4& color, float aspectScale, float textScale, const idMaterial* material ) {
+	if ( string == NULL || string[ 0 ] == '\0' || material == NULL ) {
+		return;
+	}
+
+	float drawX = x;
+	const float charWidth = BIGCHAR_WIDTH * aspectScale * textScale;
+	const float charHeight = BIGCHAR_HEIGHT * textScale;
+
+	renderSystem->SetColor( color );
+	for ( const unsigned char* s = reinterpret_cast<const unsigned char*>( string ); *s != '\0'; ++s ) {
+		if ( *s == ' ' ) {
+			drawX += charWidth;
+			continue;
+		}
+
+		const int row = ( *s ) >> 4;
+		const int col = ( *s ) & 15;
+		const float frow = row * 0.0625f;
+		const float fcol = col * 0.0625f;
+		const float size = 0.0625f;
+
+		renderSystem->DrawStretchPic( drawX, y, charWidth, charHeight, fcol, frow, fcol + size, frow + size, material );
+		drawX += charWidth;
+	}
+	renderSystem->SetColor( colorWhite );
+}
+
+static void WeaponWheelWrapString( const char* string, float maxWidth, float aspectScale, float textScale, idStrList& lines ) {
+	lines.Clear();
+	if ( string == NULL || string[ 0 ] == '\0' ) {
+		return;
+	}
+
+	const char* cursor = string;
+	idStr currentLine;
+
+	while ( *cursor != '\0' ) {
+		while ( *cursor == ' ' ) {
+			cursor++;
+		}
+
+		if ( *cursor == '\0' ) {
+			break;
+		}
+
+		const char* wordStart = cursor;
+		while ( *cursor != '\0' && *cursor != ' ' ) {
+			cursor++;
+		}
+
+		idStr word;
+		word.Append( wordStart, cursor - wordStart );
+
+		idStr candidate = currentLine;
+		if ( candidate.Length() > 0 ) {
+			candidate += " ";
+		}
+		candidate += word;
+
+		if ( currentLine.Length() > 0 && WeaponWheelStringWidth( candidate.c_str(), aspectScale, textScale ) > maxWidth ) {
+			lines.Append( currentLine );
+			currentLine = word;
+		} else {
+			currentLine = candidate;
+		}
+	}
+
+	if ( currentLine.Length() > 0 ) {
+		lines.Append( currentLine );
+	}
+}
+
+static int WeaponWheelGetOverlayIndex( bool hasWeapon, bool lowAmmo ) {
+	if ( !hasWeapon ) {
+		return 2;
+	}
+	return lowAmmo ? 1 : 0;
+}
+
+static const char* WeaponWheelGetBackdropMaterialName( int weaponIndex ) {
+	switch ( weaponIndex ) {
+		case 0:
+		case 1:
+			return "gfx/guis/weapons/machinegun/bg";
+		case 2:
+			return "gfx/guis/weapons/shotgun/bg";
+		case 3:
+		case 8:
+			return "gfx/guis/weapons/hyperblaster/bg";
+		case 4:
+		case 6:
+		case 9:
+		case 10:
+			return "gfx/guis/weapons/rocketlauncher/mid";
+		case 5:
+			return "gfx/guis/weapons/nailgun/mask";
+		case 7:
+			return "gfx/guis/weapons/railgun/bg";
+		default:
+			return "gfx/guis/weapons/shotgun/bg_o";
+	}
+}
+
+static idVec4 WeaponWheelStateColor( bool hasWeapon, bool lowAmmo, float alpha ) {
+	if ( !hasWeapon ) {
+		return idVec4( 0.38f, 0.11f, 0.11f, alpha );
+	}
+	if ( lowAmmo ) {
+		return idVec4( 0.85f, 0.48f, 0.10f, alpha );
+	}
+	return idVec4( 0.82f, 0.92f, 1.00f, alpha );
+}
+}
+
 //const idEventDef EV_Player_HideDatabaseEntry ( "<hidedatabaseentry>", NULL );
 const idEventDef EV_Player_ZoomIn ( "<zoomin>" );
 const idEventDef EV_Player_ZoomOut ( "<zoomout>" );
@@ -1254,6 +1463,14 @@ idPlayer::idPlayer() {
 	
 	oldMouseX				= 0;
 	oldMouseY				= 0;
+	weaponWheelActive		= false;
+	weaponWheelHoveredSlot	= -1;
+	weaponWheelLastMouseX	= 0;
+	weaponWheelLastMouseY	= 0;
+	weaponWheelLastUpdateTime = 0;
+	weaponWheelBlend		= 0.0f;
+	weaponWheelBaseTimescale = 1.0f;
+	weaponWheelCursor.Zero();
 
 	lastDamageDef			= 0;
 	lastDamageDir			= vec3_zero;
@@ -1424,7 +1641,6 @@ void idPlayer::SetWeapon( int weaponIndex ) {
 	weapon->Init( this, weaponDef, currentWeapon, isStrogg );
 	weapon->CallSpawn( );
 
-	// Reset the zoom fov on weapon change
 	if ( zoomed ) {
 		zoomFov.Init ( gameLocal.time, 100, CalcFov(true), DefaultFov() );
 		zoomed = false;
@@ -1545,6 +1761,7 @@ void idPlayer::Init( void ) {
 	landChange				= 0;
 	landTime				= 0;
 	zoomFov.Init( 0, 0, 0, 0 );
+	zoomed					= false;
 	centerView.Init( 0, 0, 0, 0 );
 	fxFov					= false;
 
@@ -1566,6 +1783,7 @@ void idPlayer::Init( void ) {
 	
 	talkingNPC				= NULL;
  	talkCursor				= 0;
+	ResetWeaponWheel( true );
 
 	lightningEffects		= 0;
 	lightningNextTime		= 0;
@@ -1590,8 +1808,7 @@ void idPlayer::Init( void ) {
 	SetupWeaponEntity( );
 	currentWeapon = -1;
 	previousWeapon = -1;
-	// Flashlight is a single-player mechanic.
-	flashlightOn	  = !gameLocal.isMultiplayer;
+	flashlightOn	  = false;
 	idealLegsYaw = 0.0f;
 	legsYaw = 0.0f;
 	legsForward = true;
@@ -2531,6 +2748,8 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
 	savefile->ReadBool( isStrogg );
 
 	savefile->ReadInterpolate( zoomFov );
+	zoomed = false;
+	zoomFov.Init( 0, 0, DefaultFov(), DefaultFov() );
 	savefile->ReadInterpolate( centerView );
 	savefile->ReadBool( fxFov );
 
@@ -2573,6 +2792,9 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
 
 	savefile->ReadInt( oldMouseX );
 	savefile->ReadInt( oldMouseY );
+	ResetWeaponWheel( true );
+	weaponWheelLastMouseX = oldMouseX;
+	weaponWheelLastMouseY = oldMouseY;
 
  	savefile->ReadBool( tipUp );
  	savefile->ReadBool( objectiveUp );
@@ -3795,7 +4017,7 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 	if ( vehicleController.IsDriving( ) ) {
 		if ( !gameDebug.IsHudActive( DBGHUD_ANY ) ) {
 			vehicleController.DrawHUD( );
-			if ( cursor && health > 0 ) {			
+			if ( cursor && health > 0 && weaponWheelBlend <= 0.01f ) {		
 				// mekberg: adjustable crosshair size.
 				int crossSize = cvarSystem->GetCVarInteger( "g_crosshairSize" );
 				crossSize = crossSize - crossSize % 8;
@@ -3872,6 +4094,7 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 			}
 		}		
 	 	_hud->Redraw( gameLocal.realClientTime );
+		DrawWeaponWheel();
 	}
 
 	if ( gameLocal.isMultiplayer ) {
@@ -7879,6 +8102,11 @@ void idPlayer::UpdateViewAngles( void ) {
 	int i;
 	idAngles delta;
 
+	if ( weaponWheelActive ) {
+		UpdateDeltaViewAngles( viewAngles );
+		return;
+	}
+
 	if ( !noclip && ( gameLocal.inCinematic || privateCameraView || gameLocal.GetCamera() || influenceActive == INFLUENCE_LEVEL2 ) ) {
 		// no view changes at all, but we still want to update the deltas or else when
 		// we get out of this mode, our view will snap to a kind of random angle
@@ -8850,6 +9078,7 @@ void idPlayer::EvaluateControls( void ) {
 	}
 	scoreBoardOpen		= ( ( usercmd.buttons & BUTTON_SCORES ) != 0 || forceScoreBoard );
 
+	UpdateWeaponWheel();
 	oldFlags = usercmd.flags;
 
 	AdjustSpeed();
@@ -9484,6 +9713,7 @@ void idPlayer::Think( void ) {
 	usercmd = gameLocal.usercmds[ entityNumber ];
 	buttonMask &= usercmd.buttons;
 	usercmd.buttons &= ~buttonMask;
+	ApplyWeaponWheelInputMask();
 
 	HandleObjectiveInput();
 	if ( objectiveSystemOpen ) {
@@ -9790,6 +10020,421 @@ void idPlayer::RouteGuiMouse( idUserInterface *gui ) {
 		oldMouseX = usercmd.mx;
 		oldMouseY = usercmd.my;
 	}
+}
+
+bool idPlayer::CanUseWeaponWheel( void ) {
+	return !gameLocal.isMultiplayer &&
+		entityNumber == gameLocal.localClientNum &&
+		!spectating &&
+		health > 0 &&
+		!pfl.dead &&
+		weaponEnabled &&
+		!gameLocal.inCinematic &&
+		!privateCameraView &&
+		gameLocal.GetCamera() == NULL &&
+		!GuiActive() &&
+		!objectiveSystemOpen &&
+		!vehicleController.IsDriving();
+}
+
+void idPlayer::ApplyWeaponWheelInputMask( void ) {
+	if ( !CanUseWeaponWheel() ) {
+		return;
+	}
+
+	if ( ( usercmd.buttons & BUTTON_WEAPONWHEEL ) == 0 ) {
+		return;
+	}
+
+	const int maskedButtons = BUTTON_ATTACK | BUTTON_ZOOM | BUTTON_SCORES;
+	buttonMask |= maskedButtons;
+	usercmd.buttons &= ~maskedButtons;
+}
+
+void idPlayer::ResetWeaponWheel( bool instantRestore ) {
+	weaponWheelActive = false;
+	weaponWheelHoveredSlot = GetWeaponWheelSlotForWeapon( currentWeapon );
+	weaponWheelCursor.Zero();
+	weaponWheelLastMouseX = usercmd.mx;
+	weaponWheelLastMouseY = usercmd.my;
+	weaponWheelLastUpdateTime = Sys_Milliseconds();
+	weaponWheelBaseTimescale = cvarSystem->GetCVarFloat( "timescale" );
+
+	if ( instantRestore ) {
+		weaponWheelBlend = 0.0f;
+		gameLocal.SetSpecialEffect( SPECIAL_EFFECT_BLUR, false );
+		cvarSystem->SetCVarFloat( "timescale", weaponWheelBaseTimescale );
+	}
+}
+
+int idPlayer::GetWeaponWheelSlotForWeapon( int weaponIndex ) const {
+	for ( int i = 0; i < WEAPON_WHEEL_SLOT_COUNT; ++i ) {
+		if ( weaponWheelSlotWeapons[ i ] == weaponIndex ) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
+int idPlayer::GetWeaponWheelWeaponForSlot( int slot ) const {
+	if ( slot < 0 || slot >= WEAPON_WHEEL_SLOT_COUNT ) {
+		return -1;
+	}
+
+	return weaponWheelSlotWeapons[ slot ];
+}
+
+int idPlayer::GetWeaponWheelAmmoCount( int weaponIndex ) {
+	if ( weaponIndex < 0 || weaponIndex >= MAX_WEAPONS ) {
+		return -1;
+	}
+
+	const char* weaponName = spawnArgs.GetString( va( "def_weapon%d", weaponIndex ) );
+	if ( weaponName == NULL || weaponName[ 0 ] == '\0' ) {
+		return -1;
+	}
+
+	int ammoRequired = 0;
+	const int ammoIndex = inventory.AmmoIndexForWeaponClass( weaponName, &ammoRequired );
+	if ( ammoIndex <= 0 || ammoRequired <= 0 ) {
+		return -1;
+	}
+
+	return inventory.HasAmmo( ammoIndex, ammoRequired );
+}
+
+bool idPlayer::IsWeaponWheelSlotLowAmmo( int slot ) {
+	const int weaponIndex = GetWeaponWheelWeaponForSlot( slot );
+	if ( weaponIndex < 0 || weaponIndex >= MAX_WEAPONS ) {
+		return false;
+	}
+
+	if ( ( inventory.weapons & ( 1 << weaponIndex ) ) == 0 ) {
+		return false;
+	}
+
+	const idDeclEntityDef* weaponDecl = GetWeaponDef( weaponIndex );
+	if ( weaponDecl == NULL ) {
+		return false;
+	}
+
+	const int ammoCount = GetWeaponWheelAmmoCount( weaponIndex );
+	if ( ammoCount <= 0 ) {
+		return false;
+	}
+
+	int lowAmmo = weaponDecl->dict.GetInt( "lowAmmo", "0" );
+	if ( lowAmmo <= 0 ) {
+		lowAmmo = 2;
+	}
+
+	return ammoCount <= lowAmmo;
+}
+
+void idPlayer::UpdateWeaponWheelCursor( void ) {
+	const int mouseDx = usercmd.mx - weaponWheelLastMouseX;
+	const int mouseDy = usercmd.my - weaponWheelLastMouseY;
+
+	weaponWheelLastMouseX = usercmd.mx;
+	weaponWheelLastMouseY = usercmd.my;
+
+	weaponWheelCursor.x += mouseDx * WEAPON_WHEEL_MOUSE_SENSITIVITY;
+	weaponWheelCursor.y += mouseDy * WEAPON_WHEEL_MOUSE_SENSITIVITY;
+
+	const float cursorLength = weaponWheelCursor.Length();
+	if ( cursorLength > WEAPON_WHEEL_CURSOR_RADIUS ) {
+		weaponWheelCursor *= ( WEAPON_WHEEL_CURSOR_RADIUS / cursorLength );
+	}
+}
+
+void idPlayer::UpdateWeaponWheelEffects( void ) {
+	const float blend = idMath::ClampFloat( 0.0f, 1.0f, weaponWheelBlend );
+	const float targetTimescale = weaponWheelBaseTimescale * WEAPON_WHEEL_TIMESCALE_SCALE;
+
+	cvarSystem->SetCVarFloat( "timescale", WeaponWheelLerp( weaponWheelBaseTimescale, targetTimescale, blend ) );
+
+	if ( blend <= 0.0f ) {
+		gameLocal.SetSpecialEffect( SPECIAL_EFFECT_BLUR, false );
+		return;
+	}
+
+	gameLocal.SetSpecialEffect( SPECIAL_EFFECT_BLUR, true );
+	gameLocal.SetSpecialEffectParm( SPECIAL_EFFECT_BLUR, 0, WeaponWheelLerp( 0.694f, 0.820f, blend ) );
+	gameLocal.SetSpecialEffectParm( SPECIAL_EFFECT_BLUR, 1, WeaponWheelLerp( 0.694f, 0.860f, blend ) );
+	gameLocal.SetSpecialEffectParm( SPECIAL_EFFECT_BLUR, 2, WeaponWheelLerp( 0.694f, 0.930f, blend ) );
+	gameLocal.SetSpecialEffectParm( SPECIAL_EFFECT_BLUR, 3, 1.0f );
+	gameLocal.SetSpecialEffectParm( SPECIAL_EFFECT_BLUR, 4, WeaponWheelLerp( 2.5f, 13.5f, blend ) );
+	gameLocal.SetSpecialEffectParm( SPECIAL_EFFECT_BLUR, 5, WeaponWheelLerp( 220.0f, 42.0f, blend ) );
+	gameLocal.SetSpecialEffectParm( SPECIAL_EFFECT_BLUR, 6, blend );
+	gameLocal.SetSpecialEffectParm( SPECIAL_EFFECT_BLUR, 7, Max( cvarSystem->GetCVarFloat( "r_znear" ), 0.25f ) );
+}
+
+void idPlayer::UpdateWeaponWheel( void ) {
+	const bool canUseWheel = CanUseWeaponWheel();
+	const bool held = canUseWheel && ( usercmd.buttons & BUTTON_WEAPONWHEEL ) != 0;
+	const int now = Sys_Milliseconds();
+
+	if ( weaponWheelLastUpdateTime == 0 ) {
+		weaponWheelLastUpdateTime = now;
+	}
+
+	float dt = MS2SEC( idMath::ClampInt( 0, 100, now - weaponWheelLastUpdateTime ) );
+	weaponWheelLastUpdateTime = now;
+
+	if ( !canUseWheel ) {
+		weaponWheelActive = false;
+		weaponWheelBlend = Max( 0.0f, weaponWheelBlend - dt * WEAPON_WHEEL_BLEND_OUT_SPEED );
+		UpdateWeaponWheelEffects();
+		if ( weaponWheelBlend <= 0.0f ) {
+			ResetWeaponWheel( true );
+		}
+		return;
+	}
+
+	if ( held && !weaponWheelActive ) {
+		weaponWheelActive = true;
+		if ( weaponWheelBlend <= 0.0f || weaponWheelBaseTimescale <= 0.0f ) {
+			weaponWheelBaseTimescale = Max( cvarSystem->GetCVarFloat( "timescale" ), 0.001f );
+		}
+		weaponWheelCursor.Zero();
+		weaponWheelLastMouseX = usercmd.mx;
+		weaponWheelLastMouseY = usercmd.my;
+		weaponWheelHoveredSlot = GetWeaponWheelSlotForWeapon( currentWeapon );
+		if ( weaponWheelHoveredSlot < 0 ) {
+			weaponWheelHoveredSlot = 0;
+		}
+	}
+
+	if ( weaponWheelActive ) {
+		UpdateWeaponWheelCursor();
+
+		if ( weaponWheelCursor.Length() > WEAPON_WHEEL_DEADZONE_RADIUS ) {
+			const float slice = idMath::TWO_PI / WEAPON_WHEEL_SLOT_COUNT;
+			float angle = atan2f( weaponWheelCursor.x, -weaponWheelCursor.y );
+			if ( angle < 0.0f ) {
+				angle += idMath::TWO_PI;
+			}
+
+			weaponWheelHoveredSlot = idMath::Ftoi( ( angle + slice * 0.5f ) / slice ) % WEAPON_WHEEL_SLOT_COUNT;
+		} else if ( weaponWheelHoveredSlot < 0 ) {
+			weaponWheelHoveredSlot = GetWeaponWheelSlotForWeapon( currentWeapon );
+		}
+	} else {
+		weaponWheelLastMouseX = usercmd.mx;
+		weaponWheelLastMouseY = usercmd.my;
+	}
+
+	if ( !held && weaponWheelActive ) {
+		const int selectedWeapon = GetWeaponWheelWeaponForSlot( weaponWheelHoveredSlot );
+		weaponWheelActive = false;
+		weaponWheelCursor.Zero();
+		weaponWheelLastMouseX = usercmd.mx;
+		weaponWheelLastMouseY = usercmd.my;
+
+		if ( selectedWeapon >= 0 && selectedWeapon < MAX_WEAPONS && ( inventory.weapons & ( 1 << selectedWeapon ) ) != 0 ) {
+			SelectWeapon( selectedWeapon, false );
+		}
+	}
+
+	const float targetBlend = held ? 1.0f : 0.0f;
+	if ( weaponWheelBlend < targetBlend ) {
+		weaponWheelBlend = Min( 1.0f, weaponWheelBlend + dt * WEAPON_WHEEL_BLEND_IN_SPEED );
+	} else if ( weaponWheelBlend > targetBlend ) {
+		weaponWheelBlend = Max( 0.0f, weaponWheelBlend - dt * WEAPON_WHEEL_BLEND_OUT_SPEED );
+	}
+
+	UpdateWeaponWheelEffects();
+}
+
+void idPlayer::DrawWeaponWheel( void ) {
+	const float blend = idMath::ClampFloat( 0.0f, 1.0f, weaponWheelBlend );
+	if ( blend <= 0.0f ) {
+		return;
+	}
+
+	const idMaterial* whiteMaterial = declManager->FindMaterial( "_white" );
+	const idMaterial* fontMaterial = declManager->FindMaterial( "fonts/english/bigchars" );
+	if ( whiteMaterial == NULL ) {
+		return;
+	}
+
+	const idVec2 center( WEAPON_WHEEL_CENTER_X, WEAPON_WHEEL_CENTER_Y );
+	const float aspectScale = WeaponWheelGetAspectScale();
+	const float slice = idMath::TWO_PI / WEAPON_WHEEL_SLOT_COUNT;
+	const float wedgeAlpha = 0.80f * blend;
+	const float lineAlpha = 0.92f * blend;
+	const float cardAlpha = 0.92f * blend;
+
+	for ( int slot = 0; slot < WEAPON_WHEEL_SLOT_COUNT; ++slot ) {
+		const int weaponIndex = GetWeaponWheelWeaponForSlot( slot );
+		const bool hasWeapon = weaponIndex >= 0 && ( inventory.weapons & ( 1 << weaponIndex ) ) != 0;
+		const bool lowAmmo = hasWeapon && IsWeaponWheelSlotLowAmmo( slot );
+		const int overlayIndex = WeaponWheelGetOverlayIndex( hasWeapon, lowAmmo );
+		const idMaterial* overlayMaterial = declManager->FindMaterial( weaponWheelOverlayMaterials[ overlayIndex ], false );
+		const float centerAngle = slot * slice;
+		const float startAngle = centerAngle - slice * 0.5f;
+		const float endAngle = centerAngle + slice * 0.5f;
+		const bool hovered = ( slot == weaponWheelHoveredSlot );
+		const float popout = hovered ? 6.0f * blend : 0.0f;
+		const idVec2 popoutOffset = WeaponWheelDirection( centerAngle ) * popout;
+
+		if ( overlayMaterial != NULL ) {
+			renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, wedgeAlpha );
+
+			for ( int step = 0; step < WEAPON_WHEEL_WEDGE_SUBDIVISIONS; ++step ) {
+				const float frac0 = static_cast<float>( step ) / WEAPON_WHEEL_WEDGE_SUBDIVISIONS;
+				const float frac1 = static_cast<float>( step + 1 ) / WEAPON_WHEEL_WEDGE_SUBDIVISIONS;
+				const float angle0 = startAngle + ( endAngle - startAngle ) * frac0;
+				const float angle1 = startAngle + ( endAngle - startAngle ) * frac1;
+				const idVec2 dir0 = WeaponWheelDirection( angle0 );
+				const idVec2 dir1 = WeaponWheelDirection( angle1 );
+				const idVec2 inner0Local = popoutOffset + dir0 * WEAPON_WHEEL_INNER_RADIUS;
+				const idVec2 outer0Local = popoutOffset + dir0 * WEAPON_WHEEL_OUTER_RADIUS;
+				const idVec2 inner1Local = popoutOffset + dir1 * WEAPON_WHEEL_INNER_RADIUS;
+				const idVec2 outer1Local = popoutOffset + dir1 * WEAPON_WHEEL_OUTER_RADIUS;
+				const idVec2 inner0 = WeaponWheelProjectPoint( center, inner0Local, aspectScale );
+				const idVec2 outer0 = WeaponWheelProjectPoint( center, outer0Local, aspectScale );
+				const idVec2 inner1 = WeaponWheelProjectPoint( center, inner1Local, aspectScale );
+				const idVec2 outer1 = WeaponWheelProjectPoint( center, outer1Local, aspectScale );
+				const idVec2 texInner0( 0.5f + inner0Local.x / ( WEAPON_WHEEL_OUTER_RADIUS * 2.0f ), 0.5f + inner0Local.y / ( WEAPON_WHEEL_OUTER_RADIUS * 2.0f ) );
+				const idVec2 texOuter0( 0.5f + outer0Local.x / ( WEAPON_WHEEL_OUTER_RADIUS * 2.0f ), 0.5f + outer0Local.y / ( WEAPON_WHEEL_OUTER_RADIUS * 2.0f ) );
+				const idVec2 texInner1( 0.5f + inner1Local.x / ( WEAPON_WHEEL_OUTER_RADIUS * 2.0f ), 0.5f + inner1Local.y / ( WEAPON_WHEEL_OUTER_RADIUS * 2.0f ) );
+				const idVec2 texOuter1( 0.5f + outer1Local.x / ( WEAPON_WHEEL_OUTER_RADIUS * 2.0f ), 0.5f + outer1Local.y / ( WEAPON_WHEEL_OUTER_RADIUS * 2.0f ) );
+
+				renderSystem->DrawStretchTri( inner0, outer0, outer1, texInner0, texOuter0, texOuter1, overlayMaterial );
+				renderSystem->DrawStretchTri( inner0, outer1, inner1, texInner0, texOuter1, texInner1, overlayMaterial );
+			}
+		}
+
+		if ( weaponIndex < 0 ) {
+			continue;
+		}
+
+		const idDeclEntityDef* weaponDecl = GetWeaponDef( weaponIndex );
+		if ( weaponDecl == NULL ) {
+			continue;
+		}
+
+		const idVec2 slotDir = WeaponWheelDirection( centerAngle );
+		const idVec2 slotCenterLocal = popoutOffset + slotDir * ( ( WEAPON_WHEEL_INNER_RADIUS + WEAPON_WHEEL_OUTER_RADIUS ) * 0.5f );
+		const idVec4 stateColor = WeaponWheelStateColor( hasWeapon, lowAmmo, cardAlpha );
+		const char* backdropName = WeaponWheelGetBackdropMaterialName( weaponIndex );
+		const idMaterial* backdropMaterial = ( backdropName != NULL ) ? declManager->FindMaterial( backdropName, false ) : NULL;
+
+		if ( backdropMaterial != NULL ) {
+			renderSystem->SetColor4( stateColor.x, stateColor.y, stateColor.z, stateColor.w );
+			renderSystem->DrawStretchPic(
+				center.x + ( slotCenterLocal.x - WEAPON_WHEEL_CARD_WIDTH * 0.5f + WEAPON_WHEEL_CARD_SHIFT_X ) * aspectScale,
+				center.y + slotCenterLocal.y - WEAPON_WHEEL_CARD_HEIGHT * 0.5f + WEAPON_WHEEL_CARD_SHIFT_Y,
+				WEAPON_WHEEL_CARD_WIDTH * aspectScale,
+				WEAPON_WHEEL_CARD_HEIGHT,
+				0.0f,
+				0.0f,
+				1.0f,
+				1.0f,
+				backdropMaterial );
+		}
+
+		const char* iconName = weaponDecl->dict.GetString( "inv_icon" );
+		if ( iconName != NULL && iconName[ 0 ] != '\0' ) {
+			const idMaterial* iconMaterial = declManager->FindMaterial( iconName, false );
+			if ( iconMaterial != NULL ) {
+				const float iconSize = ( backdropMaterial != NULL ) ? WEAPON_WHEEL_ICON_SIZE : WEAPON_WHEEL_SLOT_ICON_SIZE;
+				idVec4 iconColor = hasWeapon ? idVec4( 1.0f, 1.0f, 1.0f, cardAlpha ) : idVec4( 0.55f, 0.55f, 0.55f, cardAlpha );
+				if ( lowAmmo ) {
+					iconColor.Set( 1.0f, 0.90f, 0.82f, cardAlpha );
+				}
+
+				renderSystem->SetColor4( iconColor.x, iconColor.y, iconColor.z, iconColor.w );
+				renderSystem->DrawStretchPic(
+					center.x + ( slotCenterLocal.x - iconSize * 0.5f + WEAPON_WHEEL_CARD_SHIFT_X ) * aspectScale,
+					center.y + slotCenterLocal.y - iconSize * 0.5f + WEAPON_WHEEL_CARD_SHIFT_Y,
+					iconSize * aspectScale,
+					iconSize,
+					0.0f,
+					0.0f,
+					1.0f,
+					1.0f,
+					iconMaterial );
+			}
+		}
+
+		const int ammoCount = GetWeaponWheelAmmoCount( weaponIndex );
+		if ( ammoCount >= 0 ) {
+			const idVec2 countPos = WeaponWheelProjectPoint( center, popoutOffset + slotDir * WEAPON_WHEEL_COUNT_RADIUS, aspectScale );
+			const idVec4 countColor = hasWeapon ? ( lowAmmo ? idVec4( 1.0f, 0.78f, 0.42f, blend ) : idVec4( 0.95f, 0.97f, 1.0f, blend ) ) : idVec4( 0.48f, 0.48f, 0.48f, blend );
+			const char* ammoString = va( "%d", ammoCount );
+			const float ammoWidth = WeaponWheelStringWidth( ammoString, aspectScale, 1.0f );
+			DrawWeaponWheelString( countPos.x - ammoWidth * 0.5f, countPos.y - BIGCHAR_HEIGHT * 0.5f, ammoString, countColor, aspectScale, 1.0f, fontMaterial );
+		}
+	}
+
+	renderSystem->SetColor4( 0.96f, 0.98f, 1.0f, lineAlpha );
+	for ( int slot = 0; slot < WEAPON_WHEEL_SLOT_COUNT; ++slot ) {
+		const float boundaryAngle = ( slot * slice ) - slice * 0.5f;
+		const idVec2 dir = WeaponWheelDirection( boundaryAngle );
+		DrawWeaponWheelLine( center, dir * WEAPON_WHEEL_INNER_RADIUS, dir * WEAPON_WHEEL_OUTER_RADIUS, WEAPON_WHEEL_LINE_THICKNESS * 0.5f, aspectScale, whiteMaterial );
+	}
+
+	for ( int step = 0; step < WEAPON_WHEEL_SLOT_COUNT * 2; ++step ) {
+		const float angle0 = ( step / static_cast<float>( WEAPON_WHEEL_SLOT_COUNT * 2 ) ) * idMath::TWO_PI;
+		const float angle1 = ( ( step + 1 ) / static_cast<float>( WEAPON_WHEEL_SLOT_COUNT * 2 ) ) * idMath::TWO_PI;
+		const idVec2 outer0 = WeaponWheelDirection( angle0 ) * WEAPON_WHEEL_OUTER_RADIUS;
+		const idVec2 outer1 = WeaponWheelDirection( angle1 ) * WEAPON_WHEEL_OUTER_RADIUS;
+		const idVec2 inner0 = WeaponWheelDirection( angle0 ) * WEAPON_WHEEL_INNER_RADIUS;
+		const idVec2 inner1 = WeaponWheelDirection( angle1 ) * WEAPON_WHEEL_INNER_RADIUS;
+		DrawWeaponWheelLine( center, outer0, outer1, WEAPON_WHEEL_LINE_THICKNESS * 0.5f, aspectScale, whiteMaterial );
+		DrawWeaponWheelLine( center, inner0, inner1, WEAPON_WHEEL_LINE_THICKNESS * 0.5f, aspectScale, whiteMaterial );
+	}
+
+	if ( weaponWheelHoveredSlot >= 0 && weaponWheelHoveredSlot < WEAPON_WHEEL_SLOT_COUNT ) {
+		const float angle = weaponWheelHoveredSlot * slice;
+		const idVec2 dir = WeaponWheelDirection( angle );
+		const idVec2 tip = WeaponWheelProjectPoint( center, dir * WEAPON_WHEEL_ARROW_OFFSET, aspectScale );
+		const idVec2 perp( -dir.y, dir.x );
+		const idVec2 left = WeaponWheelProjectPoint( center, dir * ( WEAPON_WHEEL_ARROW_OFFSET - WEAPON_WHEEL_ARROW_LENGTH ) + perp * WEAPON_WHEEL_ARROW_HALF_WIDTH, aspectScale );
+		const idVec2 right = WeaponWheelProjectPoint( center, dir * ( WEAPON_WHEEL_ARROW_OFFSET - WEAPON_WHEEL_ARROW_LENGTH ) - perp * WEAPON_WHEEL_ARROW_HALF_WIDTH, aspectScale );
+		renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, lineAlpha );
+		renderSystem->DrawStretchTri( tip, left, right, idVec2( 0.0f, 0.0f ), idVec2( 1.0f, 0.0f ), idVec2( 0.0f, 1.0f ), whiteMaterial );
+	}
+
+	{
+		const int weaponIndex = GetWeaponWheelWeaponForSlot( weaponWheelHoveredSlot );
+		const idDeclEntityDef* weaponDecl = ( weaponIndex >= 0 ) ? GetWeaponDef( weaponIndex ) : NULL;
+		if ( weaponDecl != NULL ) {
+			idStr weaponName = common->GetLocalizedString( weaponDecl->dict.GetString( "inv_name" ) );
+			idStrList wrappedLines;
+			WeaponWheelWrapString( weaponName.c_str(), WEAPON_WHEEL_CENTER_TEXT_WIDTH * aspectScale, aspectScale, WEAPON_WHEEL_CENTER_TEXT_SCALE, wrappedLines );
+			if ( wrappedLines.Num() > 0 ) {
+				const float lineHeight = BIGCHAR_HEIGHT * WEAPON_WHEEL_CENTER_TEXT_SCALE;
+				const float totalHeight = wrappedLines.Num() * lineHeight + Max( 0, wrappedLines.Num() - 1 ) * WEAPON_WHEEL_CENTER_TEXT_GAP;
+				float drawY = center.y - totalHeight * 0.5f;
+
+				for ( int i = 0; i < wrappedLines.Num(); ++i ) {
+					const float lineWidth = WeaponWheelStringWidth( wrappedLines[ i ].c_str(), aspectScale, WEAPON_WHEEL_CENTER_TEXT_SCALE );
+					DrawWeaponWheelString(
+						center.x - lineWidth * 0.5f,
+						drawY,
+						wrappedLines[ i ].c_str(),
+						idVec4( 1.0f, 1.0f, 1.0f, blend ),
+						aspectScale,
+						WEAPON_WHEEL_CENTER_TEXT_SCALE,
+						fontMaterial );
+					drawY += lineHeight + WEAPON_WHEEL_CENTER_TEXT_GAP;
+				}
+			}
+		}
+	}
+
+	{
+		const idVec2 cursorPos = WeaponWheelProjectPoint( center, weaponWheelCursor, aspectScale );
+		renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, lineAlpha );
+		renderSystem->DrawStretchPic( cursorPos.x - ( WEAPON_WHEEL_CURSOR_SIZE * aspectScale ) * 0.5f, cursorPos.y - 1.0f, WEAPON_WHEEL_CURSOR_SIZE * aspectScale, 2.0f, 0.0f, 0.0f, 1.0f, 1.0f, whiteMaterial );
+		renderSystem->DrawStretchPic( cursorPos.x - aspectScale, cursorPos.y - WEAPON_WHEEL_CURSOR_SIZE * 0.5f, 2.0f * aspectScale, WEAPON_WHEEL_CURSOR_SIZE, 0.0f, 0.0f, 1.0f, 1.0f, whiteMaterial );
+	}
+
+	renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
 }
 
 bool idPlayer::CanZoom( void  )
@@ -11934,6 +12579,7 @@ void idPlayer::LocalClientPredictionThink( void ) {
 
 	buttonMask &= usercmd.buttons;
 	usercmd.buttons &= ~buttonMask;
+	ApplyWeaponWheelInputMask();
 
 	if ( idealWeapon != currentWeapon ) {
 		usercmd.buttons &= ~BUTTON_ATTACK;		
@@ -12113,6 +12759,7 @@ void idPlayer::NonLocalClientPredictionThink( void ) {
 
 	buttonMask &= usercmd.buttons;
 	usercmd.buttons &= ~buttonMask;
+	ApplyWeaponWheelInputMask();
 
 	//jshepard: added this to make sure clients can see other clients and the host switching weapons
 	if ( idealWeapon != currentWeapon )	{

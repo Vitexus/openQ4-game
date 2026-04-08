@@ -3652,6 +3652,22 @@ idGameLocal::RunFrame
 		gameRenderWorld->DebugClear(0);
 	}
 
+	const int baseCmdMSec = common->GetUserCmdMSec();
+	const int baseCmdHz = common->GetUserCmdHz();
+	if ( !isMultiplayer && cvarSystem != NULL ) {
+		const float slowTimeScale = idMath::ClampFloat( 0.1f, 1.0f, cvarSystem->GetCVarFloat( "timescale" ) );
+		if ( slowTimeScale < 0.999f ) {
+			msec = idMath::ClampInt( 1, baseCmdMSec, idMath::Ftoi( baseCmdMSec * slowTimeScale + 0.5f ) );
+			mHz = Max( 1, idMath::Ftoi( 1000.0f / static_cast<float>( msec ) + 0.5f ) );
+		} else {
+			msec = baseCmdMSec;
+			mHz = baseCmdHz;
+		}
+	} else {
+		msec = baseCmdMSec;
+		mHz = baseCmdHz;
+	}
+
 	player = GetLocalPlayer();
 
 	if ( !isMultiplayer && g_stopTime.GetBool() ) {
@@ -7637,10 +7653,10 @@ void idGameLocal::ResetSpecialEffects() {
 	specialEffectParms[ SPECIAL_EFFECT_BLUR ][1] = 0.694f;
 	specialEffectParms[ SPECIAL_EFFECT_BLUR ][2] = 0.694f;
 	specialEffectParms[ SPECIAL_EFFECT_BLUR ][3] = 1.0f;
-	specialEffectParms[ SPECIAL_EFFECT_BLUR ][4] = 4.0f;
-	specialEffectParms[ SPECIAL_EFFECT_BLUR ][5] = 0.31f;
-	specialEffectParms[ SPECIAL_EFFECT_BLUR ][6] = 0.5f;
-	specialEffectParms[ SPECIAL_EFFECT_BLUR ][7] = 500.0f;
+	specialEffectParms[ SPECIAL_EFFECT_BLUR ][4] = 2.5f;
+	specialEffectParms[ SPECIAL_EFFECT_BLUR ][5] = 220.0f;
+	specialEffectParms[ SPECIAL_EFFECT_BLUR ][6] = 0.0f;
+	specialEffectParms[ SPECIAL_EFFECT_BLUR ][7] = 3.0f;
 }
 
 /*

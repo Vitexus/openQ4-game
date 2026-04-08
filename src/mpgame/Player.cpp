@@ -1432,7 +1432,6 @@ void idPlayer::SetWeapon( int weaponIndex ) {
 	weapon->Init( this, weaponDef, currentWeapon, isStrogg );
 	weapon->CallSpawn( );
 
-	// Reset the zoom fov on weapon change
 	if ( zoomed ) {
 		zoomFov.Init ( gameLocal.time, 100, CalcFov(true), DefaultFov() );
 		zoomed = false;
@@ -1559,6 +1558,7 @@ void idPlayer::Init( void ) {
 	landChange				= 0;
 	landTime				= 0;
 	zoomFov.Init( 0, 0, 0, 0 );
+	zoomed					= false;
 	centerView.Init( 0, 0, 0, 0 );
 	fxFov					= false;
 
@@ -2558,6 +2558,8 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
 	savefile->ReadBool( isStrogg );
 
 	savefile->ReadInterpolate( zoomFov );
+	zoomed = false;
+	zoomFov.Init( 0, 0, DefaultFov(), DefaultFov() );
 	savefile->ReadInterpolate( centerView );
 	savefile->ReadBool( fxFov );
 
