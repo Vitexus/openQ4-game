@@ -12,8 +12,8 @@ END_CLASS
 rvPhysics_VehicleMonster::Evaluate
 
   Evaluate the impulse based rigid body physics.
-  When a collision occurs an impulse is applied at the moment of impact but
-  the remaining time after the collision is ignored.
+  Uses the rigid-body solver's bounded within-step collision handling and then
+  constrains the result back to a vehicle-friendly upright orientation.
 ================
 */
 bool rvPhysics_VehicleMonster::Evaluate( int timeStepMSec, int endTimeMSec ) {

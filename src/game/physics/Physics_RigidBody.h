@@ -85,6 +85,7 @@ public:	// common physics interface
 	bool					IsAtRest( void ) const;
 	int						GetRestStartTime( void ) const;
 	bool					IsPushable( void ) const;
+	bool					IsInWater( void ) const;
 
 	void					SaveState( void );
 	void					RestoreState( void );

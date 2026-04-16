@@ -9291,12 +9291,12 @@ void idPlayer::PerformImpulse( int impulse ) {
 //		case IMPULSE_126:	break; // Unused
 //		case IMPULSE_127:	break; // Unused
 //// RITUAL END
-//
-//		case IMPULSE_50: {
-//			ToggleFlashlight ( );
-//			break;
-//		}
-//
+
+		case IMPULSE_50: {
+			ToggleFlashlight ( );
+			break;
+		}
+
 // 		case IMPULSE_51: {
 // 			LastWeapon();
 // 			break;

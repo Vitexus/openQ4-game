@@ -259,7 +259,7 @@ void idAF::ChangePose( idEntity *ent, int time ) {
 	float invDelta;
 	idAFBody *body;
 	idVec3 origin, lastOrigin;
-	idMat3 axis;
+	idMat3 axis, lastAxis, bodyAxis;
 	idAnimator *animatorPtr;
 	renderEntity_t *renderEntity;
 
@@ -293,9 +293,12 @@ void idAF::ChangePose( idEntity *ent, int time ) {
 		body = physicsObj.GetBody( jointMods[i].bodyId );
 		animatorPtr->GetJointTransform( jointMods[i].jointHandle, time, origin, axis );
 		lastOrigin = body->GetWorldOrigin();
+		lastAxis = body->GetWorldAxis();
+		bodyAxis = jointMods[i].jointBodyAxis * axis * renderEntity->axis;
 		body->SetWorldOrigin( renderEntity->origin + ( origin + jointMods[i].jointBodyOrigin * axis ) * renderEntity->axis );
-		body->SetWorldAxis( jointMods[i].jointBodyAxis * axis * renderEntity->axis );
+		body->SetWorldAxis( bodyAxis );
 		body->SetLinearVelocity( ( body->GetWorldOrigin() - lastOrigin ) * invDelta );
+		body->SetAngularVelocity( ( bodyAxis * lastAxis.Transpose() ).ToAngularVelocity() * invDelta );
 	}
 
 	physicsObj.UpdateClipModels();
@@ -1004,19 +1007,95 @@ bool idAF::TestSolid( void ) const {
 
 /*
 ================
+idAF::GetSolidCorrection
+
+  Finds a whole-ragdoll correction that keeps the current pose intact.
+================
+*/
+bool idAF::GetSolidCorrection( idVec3 &correction ) const {
+	int i;
+	idAFBody *body;
+	trace_t trace;
+	float depth;
+	float bestDepth;
+
+	correction.Zero();
+
+	if ( !IsLoaded() ) {
+		return false;
+	}
+
+	if ( !af_testSolid.GetBool() ) {
+		return false;
+	}
+
+	bestDepth = 0.0f;
+
+	for ( i = 0; i < physicsObj.GetNumBodies(); i++ ) {
+		body = physicsObj.GetBody( i );
+// RAVEN BEGIN
+// ddynerman: multiple clip worlds
+		if ( gameLocal.Translation( self, trace, body->GetWorldOrigin(), body->GetWorldOrigin(), body->GetClipModel(), body->GetWorldAxis(), body->GetClipMask(), self ) ) {
+// RAVEN END
+			depth = idMath::Fabs( trace.c.point * trace.c.normal - trace.c.dist );
+			if ( depth > bestDepth ) {
+				bestDepth = depth;
+				correction = trace.c.normal * ( depth + 8.0f );
+			}
+		}
+	}
+
+	return bestDepth > 0.0f;
+}
+
+/*
+================
+idAF::InheritPhysicsVelocity
+
+  Preserves the owning entity's current world motion when switching to the AF.
+================
+*/
+void idAF::InheritPhysicsVelocity( const idPhysics *sourcePhysics ) {
+	int i;
+	idAFBody *body;
+	impactInfo_t info;
+	idVec3 sourceAngularVelocity;
+
+	if ( sourcePhysics == NULL || sourcePhysics == &physicsObj ) {
+		return;
+	}
+
+	sourceAngularVelocity = sourcePhysics->GetAngularVelocity();
+
+	for ( i = 0; i < physicsObj.GetNumBodies(); i++ ) {
+		body = physicsObj.GetBody( i );
+		sourcePhysics->GetImpactInfo( 0, body->GetWorldOrigin(), &info );
+		body->SetLinearVelocity( body->GetLinearVelocity() + info.velocity );
+		body->SetAngularVelocity( body->GetAngularVelocity() + sourceAngularVelocity );
+	}
+}
+
+/*
+================
 idAF::StartFromCurrentPose
 ================
 */
 void idAF::StartFromCurrentPose( int inheritVelocityTime ) {
+	const idPhysics *sourcePhysics;
+	int solidPass;
+	idVec3 solidCorrection;
+
 	if ( !IsLoaded() ) {
 		return;
 	}
 
-	// reset the AF state so Start() primes gravity on first evaluation
-	physicsObj.PutToRest();
+	sourcePhysics = self->GetPhysics();
 
 	// if the ragdoll should inherit velocity from the animation
 	if ( inheritVelocityTime > 0 ) {
+
+		// make sure the ragdoll is at rest
+		physicsObj.PutToRest();
 
 		// set the pose for some time back
 		SetupPose( self, gameLocal.time - inheritVelocityTime );
@@ -1027,11 +1106,36 @@ void idAF::StartFromCurrentPose( int inheritVelocityTime ) {
 	else {
 		// transform the articulated figure to reflect the current animation pose
 		SetupPose( self, gameLocal.time );
+
+		// clear any stale motion if this ragdoll is not inheriting animation velocity.
+		physicsObj.PutToRest();
 	}
+
+	// Preserve the owner's current world motion on ragdoll handoff without
+	// introducing substeps or changing the fixed external simulation cadence.
+	InheritPhysicsVelocity( sourcePhysics );
 
 	physicsObj.UpdateClipModels();
 
-	TestSolid();
+	// Try to depenetrate the whole articulated figure first so the initial pose
+	// stays intact when the corpse only needs a simple world-space nudge.
+	for ( solidPass = 0; solidPass < 2; solidPass++ ) {
+		if ( !GetSolidCorrection( solidCorrection ) ) {
+			break;
+		}
+		physicsObj.TranslateNoActivate( solidCorrection );
+		physicsObj.UpdateClipModels();
+	}
+
+	// Give the ragdoll a few chances to push itself out of bad startup penetrations
+	// before enabling collision, without changing the fixed 60 Hz game step.
+	for ( solidPass = 0; solidPass < 4; solidPass++ ) {
+		if ( !TestSolid() ) {
+			break;
+		}
+		physicsObj.UpdateClipModels();
+	}
+	physicsObj.UpdateClipModels();
 
 	Start();
 

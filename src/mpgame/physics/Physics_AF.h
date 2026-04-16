@@ -860,6 +860,7 @@ public:	// common physics interface
 	void					SetAxis( const idMat3 &newAxis, int id = -1 );
 
 	void					Translate( const idVec3 &translation, int id = -1 );
+	void					TranslateNoActivate( const idVec3 &translation, int id = -1 );
 	void					Rotate( const idRotation &rotation, int id = -1 );
 
 	const idVec3 &			GetOrigin( int id = 0 ) const;

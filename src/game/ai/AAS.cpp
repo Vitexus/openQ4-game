@@ -65,11 +65,11 @@ bool idAASLocal::Init( const idStr &mapName, unsigned int mapFileCRC ) {
 		}
 // RAVEN BEGIN
 // rhummer: Check if this is a dummy file, since it really has no valid data dump it.
-		//else if ( file->IsDummyFile( mapFileCRC ) ) {
-		//	AASFileManager->FreeAAS( file );
-		//	file = NULL;
-		//	return false;
-		//}
+		else if ( file->IsDummyFile( mapFileCRC ) ) {
+			AASFileManager->FreeAAS( file );
+			file = NULL;
+			return false;
+		}
 // RAVEN END
 		SetupRouting();
 	}

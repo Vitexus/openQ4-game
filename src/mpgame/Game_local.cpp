@@ -3619,6 +3619,7 @@ gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds, int activeEdito
 
 	editors = activeEditors;
 	isLastPredictFrame = lastCatchupFrame;
+	mHz = common->GetUserCmdHz();
 
 	assert( !isClient );
 
@@ -3633,9 +3634,10 @@ gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds, int activeEdito
 		if ( serverGameFrame != framenum ) {
 			common->Warning( "core and game frame counters are out of sync: %d/%d", serverGameFrame, framenum );
 			if ( serverGameFrame > framenum ) {
-				int delta = serverGameFrame - framenum;
-				time += delta * GetMSec();
 				framenum = serverGameFrame;
+				time = common->GetUserCmdTime( framenum );
+				previousTime = time;
+				msec = common->GetUserCmdDeltaMsec( framenum );
 			} if ( serverGameFrame < framenum ) {
 				// don't do anything, let the core catchup to us
 				memset( &ret, 0, sizeof( ret ) );
@@ -3645,8 +3647,8 @@ gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds, int activeEdito
 		
 		// update the game time
 		framenum++;
-		// bdube: use GetMSec access rather than USERCMD_TIME
-		time += GetMSec();
+		time = common->GetUserCmdTime( framenum );
+		msec = time - previousTime;
 
 		realClientTime = time;
 		{

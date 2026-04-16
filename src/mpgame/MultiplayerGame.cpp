@@ -70,6 +70,82 @@ int CompareTeamsByScore( const void* left, const void* right ) {
 	 		((const rvPair<int, int>*)left)->Second();
 }
 
+/*
+================
+NormalizeScoreboardMapDeclPath
+================
+*/
+static void NormalizeScoreboardMapDeclPath( const char *mapPath, idStr &normalizedPath ) {
+	normalizedPath = ( mapPath != NULL ) ? mapPath : "";
+	normalizedPath.BackSlashesToSlashes();
+	normalizedPath.StripFileExtension();
+
+	if ( !idStr::Icmpn( normalizedPath.c_str(), "maps/", 5 ) ) {
+		normalizedPath = normalizedPath.c_str() + 5;
+	}
+}
+
+/*
+================
+ResolveScoreboardMapDecl
+================
+*/
+static const idDict *ResolveScoreboardMapDecl( const char *mapPath, idDict &mapDeclOut ) {
+	mapDeclOut.Clear();
+
+	idStr normalizedPath;
+	NormalizeScoreboardMapDeclPath( mapPath, normalizedPath );
+	if ( normalizedPath.Length() == 0 ) {
+		return NULL;
+	}
+
+	const idDecl *mapDecl = declManager->FindType( DECL_MAPDEF, normalizedPath.c_str(), false );
+	const idDeclEntityDef *mapDef = static_cast<const idDeclEntityDef *>( mapDecl );
+	if ( mapDef != NULL ) {
+		mapDeclOut = mapDef->dict;
+		mapDeclOut.Set( "path", mapDef->GetName() );
+		return &mapDeclOut;
+	}
+
+	const int numMaps = fileSystem->GetNumMaps();
+	for ( int i = 0; i < numMaps; ++i ) {
+		const idDict *candidate = fileSystem->GetMapDecl( i );
+		if ( candidate == NULL ) {
+			continue;
+		}
+
+		idStr candidatePath;
+		NormalizeScoreboardMapDeclPath( candidate->GetString( "path" ), candidatePath );
+		if ( candidatePath.Length() == 0 ) {
+			continue;
+		}
+
+		if ( !idStr::Icmp( normalizedPath.c_str(), candidatePath.c_str() ) ) {
+			mapDeclOut = *candidate;
+			return &mapDeclOut;
+		}
+	}
+
+	return NULL;
+}
+
+/*
+================
+ResolveScoreboardMapName
+================
+*/
+static const char *ResolveScoreboardMapName( const char *mapPath, idStr &mapNameOut ) {
+	mapNameOut = ( mapPath != NULL ) ? mapPath : "";
+
+	idDict mapDecl;
+	const idDict *resolvedMapDecl = ResolveScoreboardMapDecl( mapPath, mapDecl );
+	if ( resolvedMapDecl != NULL ) {
+		mapNameOut = common->GetLocalizedString( resolvedMapDecl->GetString( "name", mapNameOut.c_str() ) );
+	}
+
+	return mapNameOut.c_str();
+}
+
 static const char* mpMenuModelTeamSuffix[ TEAM_MAX ] = {
 	"marine",
 	"strogg"
@@ -1346,12 +1422,8 @@ void idMultiplayerGame::UpdateDMScoreboard( idUserInterface *scoreBoard ) {
 	scoreBoard->SetStateString( "position_text", GetPlayerRankText( player ) );
 	// shouchard:  added map name
 	// mekberg: localized string
-	const char *mapName = gameLocal.serverInfo.GetString( "si_map" );
-	const idDict *mapDict = fileSystem->GetMapDecl( mapName );
-	if ( mapDict ) {
-		mapName = common->GetLocalizedString( mapDict->GetString( "name", mapName ) );
-	}
-	scoreBoard->SetStateString( "servermap", mapName );
+	idStr mapName;
+	scoreBoard->SetStateString( "servermap", ResolveScoreboardMapName( gameLocal.serverInfo.GetString( "si_map" ), mapName ) );
 	scoreBoard->SetStateString( "serverip",	serverAddress.c_str() );
 	scoreBoard->SetStateString( "servergametype", GetLongGametypeName( gameLocal.serverInfo.GetString( "si_gameType" ) ) );
 	scoreBoard->SetStateString( "servertimelimit", va( "%s: %d", common->GetLocalizedString( "#str_107659" ), gameLocal.serverInfo.GetInt( "si_timeLimit" ) ) );
@@ -1542,12 +1614,8 @@ void idMultiplayerGame::UpdateTeamScoreboard( idUserInterface *scoreBoard ) {
 // RAVEN BEGIN
 // shouchard:  added map name
 // mekberg: get localized string.
-	const char *mapName = gameLocal.serverInfo.GetString( "si_map" );
-	const idDict *mapDict = fileSystem->GetMapDecl( mapName );
-	if ( mapDict ) {
-		mapName = common->GetLocalizedString( mapDict->GetString( "name", mapName ) );
-	}
-	scoreBoard->SetStateString( "servermap", mapName );
+	idStr mapName;
+	scoreBoard->SetStateString( "servermap", ResolveScoreboardMapName( gameLocal.serverInfo.GetString( "si_map" ), mapName ) );
 // RAVEN END
 	scoreBoard->SetStateString( "serverip",	serverAddress.c_str() );
 	scoreBoard->SetStateString( "servergametype", GetLongGametypeName( gameLocal.serverInfo.GetString( "si_gameType" ) ) );

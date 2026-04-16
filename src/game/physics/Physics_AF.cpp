@@ -5608,7 +5608,7 @@ idPhysics_AF::EvaluateContacts
 bool idPhysics_AF::EvaluateContacts( void ) {
 	int i, j, k, numContacts, numBodyContacts;
 	idAFBody *body;
-	contactInfo_t contactInfo[10];
+	contactInfo_t contactInfo[32];
 	idEntity *passEntity;
 	idVecX dir( 6, VECX_ALLOCA( 6 ) );
 
@@ -5643,12 +5643,12 @@ bool idPhysics_AF::EvaluateContacts( void ) {
 		dir.SubVec3(1).Normalize();
 // RAVEN BEGIN
 // ddynerman: multiple clip worlds
-		numContacts = gameLocal.Contacts( self, contactInfo, 10, body->current->worldOrigin, dir.SubVec6(0), 2.0f, //CONTACT_EPSILON,
+		numContacts = gameLocal.Contacts( self, contactInfo, 32, body->current->worldOrigin, dir.SubVec6(0), 2.0f, //CONTACT_EPSILON,
 						body->clipModel, body->current->worldAxis, body->clipMask, passEntity );
 // RAVEN END
 #if 1
 		// merge nearby contacts between the same bodies
-		// and assure there are at most three planar contacts between any pair of bodies
+		// and assure there are at most four planar contacts between any pair of bodies
 		for ( j = 0; j < numContacts; j++ ) {
 
 			numBodyContacts = 0;
@@ -5667,7 +5667,7 @@ bool idPhysics_AF::EvaluateContacts( void ) {
 				}
 			}
 
-			if ( k >= contacts.Num() && numBodyContacts < 3 ) {
+			if ( k >= contacts.Num() && numBodyContacts < 4 ) {
 				contacts.Append( contactInfo[j] );
 				contactBodies.Append( i );
 			}
@@ -7614,6 +7614,27 @@ void idPhysics_AF::Translate( const idVec3 &translation, int id ) {
 	Activate();
 
 	UpdateClipModels();
+}
+
+/*
+================
+idPhysics_AF::TranslateNoActivate
+================
+*/
+void idPhysics_AF::TranslateNoActivate( const idVec3 &translation, int id ) {
+	int i;
+	idAFBody *body;
+
+	if ( !worldConstraintsLocked ) {
+		for ( i = 0; i < constraints.Num(); i++ ) {
+			constraints[i]->Translate( translation );
+		}
+	}
+
+	for ( i = 0; i < bodies.Num(); i++ ) {
+		body = bodies[i];
+		body->current->worldOrigin += translation;
+	}
 }
 
 /*

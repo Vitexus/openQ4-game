@@ -337,16 +337,8 @@ rvEffect::Event_Activate
 =================
 */
 void rvEffect::Event_Activate( idEntity *activator ) {
-	// Triggered func_fx entities are "play" requests. Restart active effects so
-	// one-shot segments (including spawners) are re-fired on each activation.
-	const bool triggered = spawnArgs.GetBool( "triggered", "0" );
 	if( !clientEntities.IsListEmpty ( ) ) {
-		if( triggered ) {
-			Event_Stop ( );
-			Event_Start ( );
-		} else {
-			Event_Stop ( );
-		}
+		Event_Stop ( );
 	} else {
 		Event_Start ( );
 	}
