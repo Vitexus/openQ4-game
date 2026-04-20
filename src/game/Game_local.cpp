@@ -3652,7 +3652,21 @@ idGameLocal::RunFrame
 		gameRenderWorld->DebugClear(0);
 	}
 
+	const int baseCmdMSec = common->GetUserCmdMSec();
 	const int baseCmdHz = common->GetUserCmdHz();
+	if ( !isMultiplayer && cvarSystem != NULL ) {
+		const float slowTimeScale = idMath::ClampFloat( 0.1f, 1.0f, cvarSystem->GetCVarFloat( "timescale" ) );
+		if ( slowTimeScale < 0.999f ) {
+			msec = idMath::ClampInt( 1, baseCmdMSec, idMath::Ftoi( baseCmdMSec * slowTimeScale + 0.5f ) );
+			mHz = Max( 1, idMath::Ftoi( 1000.0f / static_cast<float>( msec ) + 0.5f ) );
+		} else {
+			msec = baseCmdMSec;
+			mHz = baseCmdHz;
+		}
+	} else {
+		msec = baseCmdMSec;
+		mHz = baseCmdHz;
+	}
 
 	player = GetLocalPlayer();
 
@@ -3671,24 +3685,8 @@ idGameLocal::RunFrame
 		// update the game time
 		framenum++;
 		previousTime = time;
-		const int frameTime = common->GetUserCmdTime( framenum );
-		const int frameMsec = frameTime - previousTime;
-		if ( !isMultiplayer && cvarSystem != NULL ) {
-			const float slowTimeScale = idMath::ClampFloat( 0.1f, 1.0f, cvarSystem->GetCVarFloat( "timescale" ) );
-			if ( slowTimeScale < 0.999f ) {
-				msec = idMath::ClampInt( 1, frameMsec, idMath::Ftoi( frameMsec * slowTimeScale + 0.5f ) );
-				mHz = Max( 1, idMath::Ftoi( static_cast<float>( baseCmdHz ) * slowTimeScale + 0.5f ) );
-				time = previousTime + msec;
-			} else {
-				msec = frameMsec;
-				mHz = baseCmdHz;
-				time = frameTime;
-			}
-		} else {
-			msec = frameMsec;
-			mHz = baseCmdHz;
-			time = frameTime;
-		}
+		// bdube: use GetMSec access rather than USERCMD_TIME
+		time += GetMSec();
 
 		realClientTime = time;
 		{
