@@ -97,6 +97,7 @@ static const idMaterial* FindPostProcessMaterial( const char* primaryName, const
 
 static void OpenQ4_RenderSceneDirect( const renderView_t *view, idRenderWorld *renderWorld, idCamera *portalSky, int renderFlags ) {
 	renderSystem->BindRenderTexture( nullptr, nullptr );
+	renderSystem->ClearRenderTarget( true, true, 1.0f, 0.0f, 0.0f, 0.0f );
 
 	if ( portalSky ) {
 		renderView_t portalSkyView = *view;
