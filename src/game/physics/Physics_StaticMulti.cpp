@@ -86,6 +86,9 @@ void idPhysics_StaticMulti::Restore( idRestoreGame *savefile ) {
 	savefile->ReadObject( reinterpret_cast<idClass *&>( self ) );
 
 	savefile->ReadInt(num);
+	if ( num < 0 || num > MAX_GENTITIES ) {
+		savefile->Error( "idPhysics_StaticMulti::Restore: invalid current state count %d", num );
+	}
 	current.AssureSize( num );
 	for ( i = 0; i < num; i++ ) {
 		savefile->ReadVec3( current[i].origin );
@@ -95,6 +98,9 @@ void idPhysics_StaticMulti::Restore( idRestoreGame *savefile ) {
 	}
 
 	savefile->ReadInt(num);
+	if ( num < 0 || num > MAX_GENTITIES ) {
+		savefile->Error( "idPhysics_StaticMulti::Restore: invalid clip model count %d", num );
+	}
 	clipModels.SetNum( num );
 	for ( i = 0; i < num; i++ ) {
 		savefile->ReadClipModel( clipModels[i] );

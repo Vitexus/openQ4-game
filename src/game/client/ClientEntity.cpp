@@ -554,8 +554,17 @@ void rvClientEntity::InitDefaultPhysics( const idVec3 &origin, const idMat3 &axi
 		}
 	}
 
-	defaultPhysicsObj.SetSelf( gameLocal.entities[ENTITYNUM_CLIENT] );
-	defaultPhysicsObj.SetClipModel( clipModel, 1.0f );
+	idEntity *physicsOwner = gameLocal.entities[ENTITYNUM_CLIENT];
+	if ( physicsOwner == NULL ) {
+		physicsOwner = gameLocal.world;
+	}
+	if ( physicsOwner != NULL ) {
+		defaultPhysicsObj.SetSelf( physicsOwner );
+		defaultPhysicsObj.SetClipModel( clipModel, 1.0f );
+	} else {
+		delete clipModel;
+		clipModel = NULL;
+	}
 	defaultPhysicsObj.SetOrigin( origin );
 	defaultPhysicsObj.SetAxis( axis );
 

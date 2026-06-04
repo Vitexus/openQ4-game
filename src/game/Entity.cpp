@@ -835,6 +835,9 @@ void idEntity::Restore( idRestoreGame *savefile ) {
 	idStr			funcname;
 
 	savefile->ReadInt( entityNumber );
+	if ( entityNumber < 0 || entityNumber >= MAX_GENTITIES ) {
+		savefile->Error( "idEntity::Restore: invalid entity number %d", entityNumber );
+	}
 	savefile->ReadInt( entityDefNumber );
 
 	// spawnNode and activeNode are restored by gameLocal
@@ -860,6 +863,9 @@ void idEntity::Restore( idRestoreGame *savefile ) {
 
 	targets.Clear();
 	savefile->ReadInt( num );
+	if ( num < 0 || num > MAX_GENTITIES ) {
+		savefile->Error( "idEntity::Restore: invalid target count %d for entity '%s'", num, name.c_str() );
+	}
 	targets.SetNum( num );
 	for( i = 0; i < num; i++ ) {
 		targets[ i ].Restore( savefile );
@@ -868,6 +874,9 @@ void idEntity::Restore( idRestoreGame *savefile ) {
 	savefile->ReadInt( health );
 
 	savefile->ReadInt( num );
+	if ( num < 0 || num > MAX_CENTITIES ) {
+		savefile->Error( "idEntity::Restore: invalid bound client entity count %d for entity '%s'", num, name.c_str() );
+	}
 	for( i = 0; i < num; i++ ) {
 		savefile->ReadObject( reinterpret_cast<idClass *&>( temp ) );
 		if( temp ) {
@@ -892,6 +901,7 @@ void idEntity::Restore( idRestoreGame *savefile ) {
 // RAVEN END
 
 	savefile->ReadStaticObject( defaultPhysicsObj );
+	defaultPhysicsObj.SetSelf( this );
 	RestorePhysics( &defaultPhysicsObj );
 
 	idEntity *templol = 0;
@@ -904,6 +914,9 @@ void idEntity::Restore( idRestoreGame *savefile ) {
 	savefile->ReadObject( reinterpret_cast<idClass *&>( teamChain ) );
 
 	savefile->ReadInt( numPVSAreas );
+	if ( numPVSAreas < -1 || numPVSAreas > MAX_PVS_AREAS ) {
+		savefile->Error( "idEntity::Restore: invalid PVS area count %d for entity '%s'", numPVSAreas, name.c_str() );
+	}
 	for( i = 0; i < MAX_PVS_AREAS; i++ ) {
 		savefile->ReadInt( PVSAreas[ i ] );
 	}
@@ -914,6 +927,9 @@ void idEntity::Restore( idRestoreGame *savefile ) {
 		signals = new signalList_t;
 		for( i = 0; i < NUM_SIGNALS; i++ ) {
 			savefile->ReadInt( num );
+			if ( num < 0 || num > MAX_GENTITIES ) {
+				savefile->Error( "idEntity::Restore: invalid signal count %d for signal %d on entity '%s'", num, i, name.c_str() );
+			}
 			signals->signal[ i ].SetNum( num );
 			for( j = 0; j < num; j++ ) {
 				savefile->ReadInt( signals->signal[ i ][ j ].threadnum );

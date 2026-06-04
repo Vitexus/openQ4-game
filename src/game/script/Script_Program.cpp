@@ -2349,6 +2349,9 @@ bool idProgram::Restore( idRestoreGame *savefile ) {
 	idStr scriptname;
 
 	savefile->ReadInt( num );
+	if ( num < 0 || num > MAX_GLOBALS ) {
+		savefile->Error( "idProgram::Restore: invalid script file count %d", num );
+	}
 	for ( i = 0; i < num; i++ ) {
 		savefile->ReadString( scriptname );
 		CompileFile( scriptname );
@@ -2358,12 +2361,21 @@ bool idProgram::Restore( idRestoreGame *savefile ) {
 	savefile->ReadInt ( filenum );		// cnicholson: Added unrestored var
 
 	savefile->ReadInt( index );
+	if ( index < -1 || index >= variableDefaults.Num() ) {
+		savefile->Error( "idProgram::Restore: invalid changed variable index %d", index );
+	}
 	while( index >= 0 ) {
 		savefile->ReadByte( variables[index] );
 		savefile->ReadInt( index );
+		if ( index < -1 || index >= variableDefaults.Num() ) {
+			savefile->Error( "idProgram::Restore: invalid changed variable index %d", index );
+		}
 	}
 
 	savefile->ReadInt( num );
+	if ( num < variableDefaults.Num() || num > MAX_GLOBALS ) {
+		savefile->Error( "idProgram::Restore: invalid variable count %d", num );
+	}
 	for ( i = variableDefaults.Num(); i < num; i++ ) {
 		savefile->ReadByte( variables[i] );
 	}

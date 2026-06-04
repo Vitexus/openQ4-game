@@ -711,6 +711,9 @@ void idEvent::Restore( idRestoreGame *savefile ) {
 	idEvent	*event;
 
 	savefile->ReadInt( num );
+	if ( num < 0 || num > MAX_EVENTS ) {
+		savefile->Error( "idEvent::Restore: invalid event count %d", num );
+	}
 
 	for ( i = 0; i < num; i++ ) {
 		if ( FreeEvents.IsListEmpty() ) {
@@ -742,8 +745,11 @@ void idEvent::Restore( idRestoreGame *savefile ) {
 
 		// read the args
 		savefile->ReadInt( argsize );
+		if ( argsize < 0 ) {
+			savefile->Error( "idEvent::Restore: invalid arg size %d on event '%s'", argsize, event->eventdef->GetName() );
+		}
 		if ( argsize != event->eventdef->GetArgSize() ) {
-			savefile->Error( "idEvent::Restore: arg size (%d) doesn't match saved arg size(%d) on event '%s'", event->eventdef->GetArgSize(), argsize, event->eventdef->GetName() );
+			savefile->Error( "idEvent::Restore: arg size (%d) doesn't match saved arg size(%d) on event '%s'", static_cast<int>( event->eventdef->GetArgSize() ), argsize, event->eventdef->GetName() );
 		}
 		if ( argsize ) {
 			event->data = eventDataAllocator.Alloc( argsize );

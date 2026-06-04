@@ -177,6 +177,7 @@ private:
 
 	idList<idClass *>		objects;
 
+	void					ReadChecked( void *buffer, int len, const char *detail );
 	void					CallRestore_r( const idTypeInfo *cls, idClass *obj );
 };
 

@@ -664,10 +664,6 @@ void idGameLocal::Shutdown( void ) {
 	delete mapFile;
 	mapFile = NULL;
 
-	// free the collision map
-	collisionModelManager->FreeMap( GetMapName() );
-	collisionModelManager->PurgeModels();
-
 // RAVEN BEGIN
 // jscott: free up static objects
 	for( i = 0; i < MAX_CLIENTS; i++ ) {
@@ -2649,6 +2645,12 @@ void idGameLocal::MapShutdown( void ) {
 // RAVEN END
 
 	ShutdownAsyncNetwork();
+
+	// Drop this map's collision-model reference before clearing the name.  Level
+	// transitions reuse the same game instance, so waiting for full game shutdown
+	// leaves previous maps pinned in the fixed collision-model table.
+	collisionModelManager->FreeMap( GetMapName() );
+	collisionModelManager->PurgeModels();
 
 	mapFileName.Clear();
 

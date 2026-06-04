@@ -914,10 +914,6 @@ void idGameLocal::Shutdown( void ) {
 	delete mapFile;
 	mapFile = NULL;
 
-	// free the collision map
-	collisionModelManager->FreeMap( GetMapName() );
-	collisionModelManager->PurgeModels();
-
 // RAVEN BEGIN
 // jscott: free up static objects
 	for( i = 0; i < MAX_CLIENTS; i++ ) {
@@ -2310,6 +2306,12 @@ void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorl
 idGameLocal::InitFromSaveGame
 =================
 */
+static void GameLocal_ValidateSaveGameCount( idRestoreGame &savegame, int count, int maxCount, const char *detail ) {
+	if ( count < 0 || count > maxCount ) {
+		savegame.Error( "idGameLocal::InitFromSaveGame: invalid %s %d (max %d)", detail, count, maxCount );
+	}
+}
+
 bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWorld, idFile *saveGameFile ) {
 	TIME_THIS_SCOPE( __FUNCLINE__);
 	
@@ -2372,6 +2374,7 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 	SetServerInfo( si );
 
 	savegame.ReadInt( numClients );
+	GameLocal_ValidateSaveGameCount( savegame, numClients, MAX_CLIENTS, "client count" );
 	for( i = 0; i < numClients; i++ ) {
 // RAVEN BEGIN
 // mekberg: don't read in userinfo. Grab from cvars
@@ -2410,12 +2413,17 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 
 	savegame.ReadInt( firstFreeIndex );
 	savegame.ReadInt( num_entities );
+	if ( firstFreeIndex < 0 || firstFreeIndex >= MAX_GENTITIES ) {
+		savegame.Error( "idGameLocal::InitFromSaveGame: invalid first free entity index %d", firstFreeIndex );
+	}
+	GameLocal_ValidateSaveGameCount( savegame, num_entities, MAX_GENTITIES, "entity count" );
 
 	// enityHash is restored by idEntity::Restore setting the entity name.
 
 	savegame.ReadObject( reinterpret_cast<idClass *&>( world ) );
 
 	savegame.ReadInt( num );
+	GameLocal_ValidateSaveGameCount( savegame, num, MAX_GENTITIES, "spawned entity count" );
 	for( i = 0; i < num; i++ ) {
 		savegame.ReadObject( reinterpret_cast<idClass *&>( ent ) );
 		assert( ent );
@@ -2427,6 +2435,7 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 // RAVEN BEGIN
 // abahr: save scriptObject proxies
 	savegame.ReadInt( num );
+	GameLocal_ValidateSaveGameCount( savegame, num, MAX_GENTITIES + MAX_CENTITIES, "script object proxy count" );
 	scriptObjectProxies.SetNum( num );
 	for( i = 0; i < num; ++i ) {
 		scriptObjectProxies[i].Restore( &savegame );
@@ -2434,6 +2443,7 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 // abahr: save client entity stuff
 	rvClientEntity* clientEnt = NULL;
 	savegame.ReadInt( num );
+	GameLocal_ValidateSaveGameCount( savegame, num, MAX_CENTITIES, "client spawned entity count" );
 	for( i = 0; i < num; ++i ) {
 		savegame.ReadObject( reinterpret_cast<idClass *&>( clientEnt ) );
 		assert( clientEnt );
@@ -2444,6 +2454,7 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 // RAVEN END
 
 	savegame.ReadInt( num );
+	GameLocal_ValidateSaveGameCount( savegame, num, MAX_GENTITIES, "active entity count" );
 	for( i = 0; i < num; i++ ) {
 		savegame.ReadObject( reinterpret_cast<idClass *&>( ent ) );
 		assert( ent );
@@ -2453,6 +2464,7 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 	}
 
 	savegame.ReadInt( numEntitiesToDeactivate );
+	GameLocal_ValidateSaveGameCount( savegame, numEntitiesToDeactivate, MAX_GENTITIES, "deactivation count" );
 	savegame.ReadBool( sortPushers );
 	savegame.ReadBool( sortTeamMasters );
 	savegame.ReadDict( &persistentLevelInfo );
@@ -2520,6 +2532,9 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 	savegame.ReadInt( spawnCount );
 
 	savegame.ReadInt( num );
+	if ( num < 0 ) {
+		savegame.Error( "idGameLocal::InitFromSaveGame: invalid location entity area count %d", num );
+	}
 	if ( num ) {
 		if ( num != gameRenderWorld->NumAreas() ) {
 			savegame.Error( "idGameLocal::InitFromSaveGame: number of areas in map differs from save game." );
@@ -2537,9 +2552,9 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 
 // RAVEN BEGIN
 // bdube: added
+	lastAIAlertActor.Restore( &savegame );
 	lastAIAlertEntity.Restore( &savegame );
 	savegame.ReadInt( lastAIAlertEntityTime );
-	lastAIAlertActor.Restore( &savegame );
 	savegame.ReadInt( lastAIAlertActorTime );
 // RAVEN END
 
@@ -2838,6 +2853,12 @@ void idGameLocal::MapShutdown( void ) {
 // RAVEN END
 
 	ShutdownAsyncNetwork();
+
+	// Drop this map's collision-model reference before clearing the name.  Level
+	// transitions reuse the same game instance, so waiting for full game shutdown
+	// leaves previous maps pinned in the fixed collision-model table.
+	collisionModelManager->FreeMap( GetMapName() );
+	collisionModelManager->PurgeModels();
 
 	mapFileName.Clear();
 

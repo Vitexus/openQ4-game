@@ -70,12 +70,18 @@ void idPhysics_Base::Restore( idRestoreGame *savefile ) {
 	savefile->ReadVec3( gravityNormal );
 
 	savefile->ReadInt( num );
+	if ( num < 0 || num > MAX_GENTITIES ) {
+		savefile->Error( "idPhysics_Base::Restore: invalid contact count %d", num );
+	}
 	contacts.SetNum( num );
 	for ( i = 0; i < contacts.Num(); i++ ) {
 		savefile->ReadContactInfo( contacts[i] );
 	}
 
 	savefile->ReadInt( num );
+	if ( num < 0 || num > MAX_GENTITIES ) {
+		savefile->Error( "idPhysics_Base::Restore: invalid contact entity count %d", num );
+	}
 	contactEntities.SetNum( num );
 	for ( i = 0; i < contactEntities.Num(); i++ ) {
 		contactEntities[i].Restore( savefile );

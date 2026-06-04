@@ -908,6 +908,9 @@ void idActor::Restore( idRestoreGame *savefile ) {
 	savefile->ReadMat3( viewAxis );
 
 	savefile->ReadInt( num );
+	if ( num < 0 || num > MAX_GENTITIES ) {
+		savefile->Error( "idActor::Restore: invalid enemy count %d", num );
+	}
 	for ( i = 0; i < num; i++ ) {
 		savefile->ReadObject( reinterpret_cast<idClass *&>( ent ) );
 		assert( ent );
@@ -931,6 +934,9 @@ void idActor::Restore( idRestoreGame *savefile ) {
 	savefile->ReadInt( pain_delay );
 
 	savefile->ReadInt( num );
+	if ( num < 0 || num > animator.NumJoints() ) {
+		savefile->Error( "idActor::Restore: invalid damage group count %d", num );
+	}
 	damageGroups.SetGranularity( 1 );
 	damageGroups.SetNum( num );
 	for( i = 0; i < num; i++ ) {
@@ -938,6 +944,9 @@ void idActor::Restore( idRestoreGame *savefile ) {
 	}
 
 	savefile->ReadInt( num );
+	if ( num < 0 || num > animator.NumJoints() ) {
+		savefile->Error( "idActor::Restore: invalid damage scale count %d", num );
+	}
 	damageScale.SetNum( num );
 	for( i = 0; i < num; i++ ) {
 		savefile->ReadFloat( damageScale[ i ] );
@@ -983,6 +992,9 @@ void idActor::Restore( idRestoreGame *savefile ) {
 	savefile->ReadInt( painTime );
 
 	savefile->ReadInt( num );
+	if ( num < 0 || num > MAX_GENTITIES ) {
+		savefile->Error( "idActor::Restore: invalid attachment count %d", num );
+	}
 	for ( i = 0; i < num; i++ ) {
 		idAttachInfo &attach = attachments.Alloc();
 		attach.ent.Restore( savefile );

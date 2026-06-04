@@ -3561,11 +3561,15 @@ void idAnimator::Restore( idRestoreGame *savefile ) {
 	int i;
 	int j;
 	int num;
+	const int maxSaveGameAnimatorItems = 4096;
 
 	savefile->ReadModelDef( modelDef );
 	savefile->ReadObject( reinterpret_cast<idClass *&>( entity ) );
 
 	savefile->ReadInt( num );
+	if ( num < 0 || num > maxSaveGameAnimatorItems ) {
+		savefile->Error( "idAnimator::Restore: invalid joint modification count %d", num );
+	}
 	jointMods.SetNum( num );
 	for( i = 0; i < num; i++ ) {
 		jointMods[ i ] = new jointMod_t;
@@ -3573,9 +3577,16 @@ void idAnimator::Restore( idRestoreGame *savefile ) {
 	}
 	
 	savefile->ReadInt( numJoints );
+	const int expectedJoints = modelDef ? modelDef->NumJoints() : 0;
+	if ( numJoints < 0 || numJoints > maxSaveGameAnimatorItems ) {
+		savefile->Error( "idAnimator::Restore: invalid joint count %d", numJoints );
+	}
+	if ( numJoints != expectedJoints ) {
+		savefile->Error( "idAnimator::Restore: saved joint count %d does not match model joint count %d", numJoints, expectedJoints );
+	}
 //RAVEN BEGIN
 //amccarthy: Added allocation tag
-	joints = (idJointMat *) Mem_Alloc16( numJoints * sizeof( joints[0] ), MA_ANIM );
+	joints = numJoints ? (idJointMat *) Mem_Alloc16( numJoints * sizeof( joints[0] ), MA_ANIM ) : NULL;
 //RAVEN END
 	savefile->Read( joints, numJoints * sizeof( joints[0] ) );
 
@@ -3587,17 +3598,26 @@ void idAnimator::Restore( idRestoreGame *savefile ) {
 	savefile->ReadFloat( AFPoseBlendWeight );
 
 	savefile->ReadInt( num );
+	if ( num < 0 || num > maxSaveGameAnimatorItems ) {
+		savefile->Error( "idAnimator::Restore: invalid AF pose joint count %d", num );
+	}
 	AFPoseJoints.SetGranularity( 1 );
 	AFPoseJoints.SetNum( num );
 	savefile->Read( AFPoseJoints.Ptr(), AFPoseJoints.MemoryUsed() );
 
 	savefile->ReadInt( num );
+	if ( num < 0 || num > maxSaveGameAnimatorItems ) {
+		savefile->Error( "idAnimator::Restore: invalid AF pose joint mod count %d", num );
+	}
 	AFPoseJointMods.SetGranularity( 1 );
 	AFPoseJointMods.SetNum( num );
 	savefile->Read( AFPoseJointMods.Ptr(), AFPoseJointMods.MemoryUsed() );
 
 	savefile->ReadInt( AFPoseJointFrameSize );
-	AFPoseJointFrame = (idJointQuat *)Mem_Alloc16( AFPoseJointFrameSize * sizeof( AFPoseJointFrame[0] ), MA_ANIM );
+	if ( AFPoseJointFrameSize < 0 || AFPoseJointFrameSize > maxSaveGameAnimatorItems ) {
+		savefile->Error( "idAnimator::Restore: invalid AF pose joint frame size %d", AFPoseJointFrameSize );
+	}
+	AFPoseJointFrame = AFPoseJointFrameSize ? (idJointQuat *)Mem_Alloc16( AFPoseJointFrameSize * sizeof( AFPoseJointFrame[0] ), MA_ANIM ) : NULL;
 	savefile->Read( AFPoseJointFrame, AFPoseJointFrameSize * sizeof( AFPoseJointFrame[0] ) );
 
 	savefile->ReadBounds( AFPoseBounds );

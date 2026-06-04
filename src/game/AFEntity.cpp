@@ -520,6 +520,9 @@ void idAFAttachment::Restore( idRestoreGame *savefile ) {
 	int i;
 	int num;
 	savefile->ReadInt( num );
+	if ( num < 0 || num > animator.NumJoints() ) {
+		savefile->Error( "idAFAttachment::Restore: invalid copied joint count %d", num );
+	}
 	copyJoints.SetNum( num );
 	for( i = 0; i < num; i++ ) {
 		int val;

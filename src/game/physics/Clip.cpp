@@ -6,6 +6,7 @@
 
 #define	MAX_SECTOR_DEPTH				12
 #define MAX_SECTORS						((1<<(MAX_SECTOR_DEPTH+1))-1)
+static const int MAX_SAVEGAME_TRACE_MODELS = MAX_GENTITIES + MAX_CENTITIES + 4096;
 
 // RAVEN BEGIN
 // ddynerman: SD's clip sector code
@@ -34,6 +35,45 @@ typedef struct trmCache_s {
 	idCollisionModel *		collisionModel;
 	int						hash; // only used to identify non-hashed trm's in a save.
 } trmCache_t;
+
+static bool SaveGameTraceModelBoundsCheck( const idTraceModel &trm ) {
+	if ( trm.type < TRM_INVALID || trm.type > TRM_CUSTOM ) {
+		return false;
+	}
+	if ( trm.numVerts < 0 || trm.numVerts > MAX_TRACEMODEL_VERTS ) {
+		return false;
+	}
+	if ( trm.numEdges < 0 || trm.numEdges > MAX_TRACEMODEL_EDGES ) {
+		return false;
+	}
+	if ( trm.numPolys < 0 || trm.numPolys > MAX_TRACEMODEL_POLYS ) {
+		return false;
+	}
+
+	for ( int i = 1; i <= trm.numEdges; i++ ) {
+		if ( trm.edges[i].v[0] < 0 || trm.edges[i].v[0] >= trm.numVerts ) {
+			return false;
+		}
+		if ( trm.edges[i].v[1] < 0 || trm.edges[i].v[1] >= trm.numVerts ) {
+			return false;
+		}
+	}
+
+	for ( int i = 0; i < trm.numPolys; i++ ) {
+		const traceModelPoly_t &poly = trm.polys[i];
+		if ( poly.numEdges < 0 || poly.numEdges > MAX_TRACEMODEL_POLYEDGES ) {
+			return false;
+		}
+		for ( int j = 0; j < poly.numEdges; j++ ) {
+			const int edgeNum = poly.edges[j];
+			if ( edgeNum == 0 || edgeNum < -trm.numEdges || edgeNum > trm.numEdges ) {
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
 
 idVec3 vec3_boxEpsilon( CM_BOX_EPSILON, CM_BOX_EPSILON, CM_BOX_EPSILON );
 
@@ -297,11 +337,17 @@ void idClipModel::RestoreTraceModels( idRestoreGame *savefile ) {
 	ClearTraceModelCache();
 
 	savefile->ReadInt( num );
+	if ( num < 0 || num > MAX_SAVEGAME_TRACE_MODELS ) {
+		savefile->Error( "idClipModel::RestoreTraceModels: invalid trace model count %d", num );
+	}
 	traceModelCache.SetNum( num );
 	for ( i = 0; i < num; i++ ) {
 		trmCache_t *entry = new trmCache_t;
 
 		savefile->Read( &entry->trm, sizeof( entry->trm ) );
+		if ( !SaveGameTraceModelBoundsCheck( entry->trm ) || !entry->trm.Verify() ) {
+			savefile->Error( "idClipModel::RestoreTraceModels: invalid trace model %d", i );
+		}
 		savefile->ReadFloat( entry->volume );
 		savefile->ReadVec3( entry->centerOfMass );
 		savefile->ReadMat3( entry->inertiaTensor );
