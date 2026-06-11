@@ -2313,7 +2313,11 @@ void idProgram::Startup( const char *defaultScript ) {
 
 	// load the default script
 	if ( defaultScript && *defaultScript ) {
-		CompileFile( defaultScript );
+		if ( fileSystem->ReadFile( defaultScript, NULL, NULL ) < 0 ) {
+			gameLocal.Warning( "Default script '%s' is missing; continuing with an empty script program.", defaultScript );
+		} else {
+			CompileFile( defaultScript );
+		}
 	}
 
 	FinishCompilation();

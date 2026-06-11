@@ -110,7 +110,7 @@ struct openq4AirDefense1SkipProbeState_t {
 
 static openq4AirDefense1SkipProbeState_t s_openq4AirDefense1SkipProbe;
 
-static void OpenQ4_ResetAirDefense1SkipProbeState( void ) {
+static void openQ4_ResetAirDefense1SkipProbeState( void ) {
 	s_openq4AirDefense1SkipProbe.enabled = false;
 	s_openq4AirDefense1SkipProbe.skipRequested = false;
 	s_openq4AirDefense1SkipProbe.liveSeen = false;
@@ -154,18 +154,18 @@ static void OpenQ4_ResetAirDefense1SkipProbeState( void ) {
 	}
 }
 
-static bool OpenQ4_IsAirDefense1SkipProbeMap( const idGameLocal &game ) {
+static bool openQ4_IsAirDefense1SkipProbeMap( const idGameLocal &game ) {
 	idStr mapName = game.GetMapName();
 	mapName.StripFileExtension();
 	return mapName.Icmp( "maps/game/airdefense1" ) == 0 || mapName.Icmp( "game/airdefense1" ) == 0;
 }
 
-static const char *OpenQ4_AirDefense1SkipProbeCameraName( const idCamera *camera ) {
+static const char *openQ4_AirDefense1SkipProbeCameraName( const idCamera *camera ) {
 	const char *name = ( camera != NULL ) ? camera->GetName() : NULL;
 	return ( name != NULL && name[0] != '\0' ) ? name : "<none>";
 }
 
-static void OpenQ4_AirDefense1SkipProbePrint( const char *stage, const int frameNum, const int gameTime, const int wallTime, const char *detail = NULL ) {
+static void openQ4_AirDefense1SkipProbePrint( const char *stage, const int frameNum, const int gameTime, const int wallTime, const char *detail = NULL ) {
 	if ( detail != NULL && detail[0] != '\0' ) {
 		gameLocal.Printf( "[airdefense1-probe] stage=%s frame=%d game=%.3fs wall=%dms %s\n", stage, frameNum, static_cast<float>( gameTime ) / 1000.0f, wallTime, detail );
 	} else {
@@ -173,7 +173,7 @@ static void OpenQ4_AirDefense1SkipProbePrint( const char *stage, const int frame
 	}
 }
 
-static void OpenQ4_AirDefense1SkipProbeAccumulateEntityThink( const idEntity *ent, const double thinkMs ) {
+static void openQ4_AirDefense1SkipProbeAccumulateEntityThink( const idEntity *ent, const double thinkMs ) {
 	if ( ent == NULL || thinkMs <= 0.0 ) {
 		return;
 	}
@@ -201,7 +201,7 @@ static void OpenQ4_AirDefense1SkipProbeAccumulateEntityThink( const idEntity *en
 	s_openq4AirDefense1SkipProbe.overflowSamples++;
 }
 
-static void OpenQ4_AirDefense1SkipProbePrintTopThinkers( const int frameNum, const int gameTime, const int wallTime ) {
+static void openQ4_AirDefense1SkipProbePrintTopThinkers( const int frameNum, const int gameTime, const int wallTime ) {
 	bool used[ OPENQ4_AIRDEFENSE1_SKIP_PROBE_ENTITY_STAT_CAP ];
 	memset( used, 0, sizeof( used ) );
 
@@ -224,7 +224,7 @@ static void OpenQ4_AirDefense1SkipProbePrintTopThinkers( const int frameNum, con
 
 		used[ bestIndex ] = true;
 		const openq4AirDefense1SkipProbeEntityStat_t &best = s_openq4AirDefense1SkipProbe.entityStats[ bestIndex ];
-		OpenQ4_AirDefense1SkipProbePrint(
+		openQ4_AirDefense1SkipProbePrint(
 			"top-think",
 			frameNum,
 			gameTime,
@@ -240,7 +240,7 @@ static void OpenQ4_AirDefense1SkipProbePrintTopThinkers( const int frameNum, con
 	}
 
 	if ( s_openq4AirDefense1SkipProbe.overflowThinkMs > 0.0 ) {
-		OpenQ4_AirDefense1SkipProbePrint(
+		openQ4_AirDefense1SkipProbePrint(
 			"top-think-overflow",
 			frameNum,
 			gameTime,
@@ -521,7 +521,7 @@ void idGameLocal::Clear( void ) {
 	autoScreenshotPending = false;
 	autoMachinegunImpactStartTime = 0;
 	autoMachinegunImpactPending = false;
-	OpenQ4_ResetAirDefense1SkipProbeState();
+	openQ4_ResetAirDefense1SkipProbeState();
 	vacuumAreaNum = 0;
 
 // RAVEN BEGIN
@@ -3943,18 +3943,18 @@ idGameLocal::RunFrame
 
 		realClientTime = time;
 		player = GetLocalPlayer();
-		const bool airDefense1SkipProbeActive = !isMultiplayer && g_airdefense1SkipProbe.GetBool() && OpenQ4_IsAirDefense1SkipProbeMap( *this );
+		const bool airDefense1SkipProbeActive = !isMultiplayer && g_airdefense1SkipProbe.GetBool() && openQ4_IsAirDefense1SkipProbeMap( *this );
 		const bool airDefense1SkipProbeProfileActive = airDefense1SkipProbeActive && g_airdefense1SkipProbeProfile.GetBool();
 		if ( airDefense1SkipProbeActive ) {
 			const int wallTimeNow = Sys_Milliseconds();
-			const char *cameraName = OpenQ4_AirDefense1SkipProbeCameraName( camera );
+			const char *cameraName = openQ4_AirDefense1SkipProbeCameraName( camera );
 			if ( !s_openq4AirDefense1SkipProbe.enabled ) {
-				OpenQ4_ResetAirDefense1SkipProbeState();
+				openQ4_ResetAirDefense1SkipProbeState();
 				s_openq4AirDefense1SkipProbe.enabled = true;
 				s_openq4AirDefense1SkipProbe.lastSkipActive = skipCinematic;
 				s_openq4AirDefense1SkipProbe.lastCameraName = cameraName;
 
-				OpenQ4_AirDefense1SkipProbePrint(
+				openQ4_AirDefense1SkipProbePrint(
 					"armed",
 					framenum,
 					time,
@@ -3963,7 +3963,7 @@ idGameLocal::RunFrame
 			}
 
 			if ( s_openq4AirDefense1SkipProbe.skipRequested && s_openq4AirDefense1SkipProbe.lastCameraName.Icmp( cameraName ) != 0 ) {
-				OpenQ4_AirDefense1SkipProbePrint(
+				openQ4_AirDefense1SkipProbePrint(
 					"camera-change",
 					framenum,
 					time,
@@ -3978,7 +3978,7 @@ idGameLocal::RunFrame
 			s_openq4AirDefense1SkipProbe.lastCameraName = cameraName;
 
 			if ( s_openq4AirDefense1SkipProbe.skipRequested && s_openq4AirDefense1SkipProbe.lastSkipActive != skipCinematic ) {
-				OpenQ4_AirDefense1SkipProbePrint(
+				openQ4_AirDefense1SkipProbePrint(
 					"skip-state",
 					framenum,
 					time,
@@ -4002,7 +4002,7 @@ idGameLocal::RunFrame
 						s_openq4AirDefense1SkipProbe.lastProgressWallTime = wallTimeNow;
 						s_openq4AirDefense1SkipProbe.nextProgressGameTime = time + SEC2MS( 10.0f );
 
-						OpenQ4_AirDefense1SkipProbePrint(
+						openQ4_AirDefense1SkipProbePrint(
 							"intro-end-trigger",
 							framenum,
 							time,
@@ -4015,7 +4015,7 @@ idGameLocal::RunFrame
 					const int segmentGameTime = time - s_openq4AirDefense1SkipProbe.lastProgressGameTime;
 					const int segmentWallTime = wallTimeNow - s_openq4AirDefense1SkipProbe.lastProgressWallTime;
 
-					OpenQ4_AirDefense1SkipProbePrint(
+					openQ4_AirDefense1SkipProbePrint(
 						"progress",
 						framenum,
 						time,
@@ -4027,7 +4027,7 @@ idGameLocal::RunFrame
 							segmentWallTime,
 							static_cast<float>( time - s_openq4AirDefense1SkipProbe.requestGameTime ) / 1000.0f,
 							wallTimeNow - s_openq4AirDefense1SkipProbe.requestWallTime ) );
-					OpenQ4_AirDefense1SkipProbePrint(
+					openQ4_AirDefense1SkipProbePrint(
 						"profile",
 						framenum,
 						time,
@@ -4069,7 +4069,7 @@ idGameLocal::RunFrame
 					s_openq4AirDefense1SkipProbe.liveSeen = true;
 					s_openq4AirDefense1SkipProbe.quitFrameNumber = framenum + 1;
 
-					OpenQ4_AirDefense1SkipProbePrint(
+					openQ4_AirDefense1SkipProbePrint(
 						"spawn-live",
 						framenum,
 						time,
@@ -4080,7 +4080,7 @@ idGameLocal::RunFrame
 							static_cast<float>( time - s_openq4AirDefense1SkipProbe.requestGameTime ) / 1000.0f,
 							wallTimeNow - s_openq4AirDefense1SkipProbe.requestWallTime ) );
 					if ( airDefense1SkipProbeProfileActive ) {
-						OpenQ4_AirDefense1SkipProbePrint(
+						openQ4_AirDefense1SkipProbePrint(
 							"profile-total",
 							framenum,
 							time,
@@ -4097,7 +4097,7 @@ idGameLocal::RunFrame
 								s_openq4AirDefense1SkipProbe.totalThinkMs,
 								s_openq4AirDefense1SkipProbe.totalEventsMs,
 								s_openq4AirDefense1SkipProbe.totalBseEndMs ) );
-						OpenQ4_AirDefense1SkipProbePrintTopThinkers( framenum, time, wallTimeNow );
+						openQ4_AirDefense1SkipProbePrintTopThinkers( framenum, time, wallTimeNow );
 					}
 				}
 
@@ -4106,7 +4106,7 @@ idGameLocal::RunFrame
 					framenum >= s_openq4AirDefense1SkipProbe.quitFrameNumber ) {
 					s_openq4AirDefense1SkipProbe.quitIssued = true;
 
-					OpenQ4_AirDefense1SkipProbePrint(
+					openQ4_AirDefense1SkipProbePrint(
 						"quit",
 						framenum,
 						time,
@@ -4119,7 +4119,7 @@ idGameLocal::RunFrame
 				}
 			}
 		} else if ( s_openq4AirDefense1SkipProbe.enabled ) {
-			OpenQ4_ResetAirDefense1SkipProbeState();
+			openQ4_ResetAirDefense1SkipProbeState();
 		}
 		int probeSectionStartMs = 0;
 		double probeViewSetupMs = 0.0;
@@ -4312,7 +4312,7 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 					currentThinkingEntity = NULL;
 					if ( airDefense1SkipProbeProfileActive && s_openq4AirDefense1SkipProbe.skipRequested ) {
 						timer_singlethink.Stop();
-						OpenQ4_AirDefense1SkipProbeAccumulateEntityThink( ent, timer_singlethink.Milliseconds() );
+						openQ4_AirDefense1SkipProbeAccumulateEntityThink( ent, timer_singlethink.Milliseconds() );
 					}
 					num++;
 				}

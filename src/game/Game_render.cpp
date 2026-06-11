@@ -55,7 +55,7 @@ static bool EvaluateSMAAAvailability( rvmGameRender_t& gameRender ) {
 		IsUsablePostProcessMaterial( gameRender.copyPostProcess1Material );
 }
 
-static bool OpenQ4_BuildPortalSkyCaptureView( const renderView_t *view, renderView_t *portalSkyView ) {
+static bool openQ4_BuildPortalSkyCaptureView( const renderView_t *view, renderView_t *portalSkyView ) {
 	return gameLocal.BuildPortalSkyRenderView( view, portalSkyView, gameRenderWorld );
 }
 
@@ -101,7 +101,7 @@ static const idMaterial* FindPostProcessMaterial( const char* primaryName, const
 	return NULL;
 }
 
-static void OpenQ4_RenderSceneDirect( const renderView_t *view, idRenderWorld *renderWorld, idCamera *portalSky, int renderFlags ) {
+static void openQ4_RenderSceneDirect( const renderView_t *view, idRenderWorld *renderWorld, idCamera *portalSky, int renderFlags ) {
 	renderSystem->BindRenderTexture( nullptr, nullptr );
 	renderSystem->ClearRenderTarget( true, true, 1.0f, 0.0f, 0.0f, 0.0f );
 
@@ -114,7 +114,7 @@ static void OpenQ4_RenderSceneDirect( const renderView_t *view, idRenderWorld *r
 	renderWorld->RenderScene( view, renderFlags | RF_PENUMBRA_MAP );
 }
 
-static void OpenQ4_BindSceneRenderTexture( idRenderTexture *renderTexture ) {
+static void openQ4_BindSceneRenderTexture( idRenderTexture *renderTexture ) {
 	// Mark game-level 3D scene targets as feedback-capable so stock materials
 	// that sample _currentRender, including heat haze, get an on-demand copy of
 	// the active scene FBO. Fullscreen post passes bind with a NULL feedback
@@ -122,7 +122,7 @@ static void OpenQ4_BindSceneRenderTexture( idRenderTexture *renderTexture ) {
 	renderSystem->BindRenderTexture( renderTexture, renderTexture );
 }
 
-static void OpenQ4_RenderSceneWorld( const renderView_t *view, idRenderWorld *renderWorld, idCamera *portalSky, int renderFlags ) {
+static void openQ4_RenderSceneWorld( const renderView_t *view, idRenderWorld *renderWorld, idCamera *portalSky, int renderFlags ) {
 	if ( portalSky ) {
 		renderView_t portalSkyView = *view;
 		portalSky->GetViewParms( &portalSkyView );
@@ -132,39 +132,39 @@ static void OpenQ4_RenderSceneWorld( const renderView_t *view, idRenderWorld *re
 	renderWorld->RenderScene( view, renderFlags | RF_PENUMBRA_MAP );
 }
 
-static void OpenQ4_DrawFullScreenMaterial( const idMaterial *material ) {
+static void openQ4_DrawFullScreenMaterial( const idMaterial *material ) {
 	renderSystem->DrawStretchPic(
 		0.0f, 0.0f, SCREEN_WIDTH, SCREEN_HEIGHT,
 		0.0f, 1.0f, 1.0f, 0.0f,
 		material );
 }
 
-static void OpenQ4_ApplySMAA( rvmGameRender_t& gameRender ) {
+static void openQ4_ApplySMAA( rvmGameRender_t& gameRender ) {
 	// Pass 1: edge detection into _postProcessAlbedo1.
 	renderSystem->BindRenderTexture( gameRender.postProcessRT[1], nullptr );
 	renderSystem->ClearRenderTarget( true, true, 1.0f, 0.0f, 0.0f, 0.0f );
-	OpenQ4_DrawFullScreenMaterial( gameRender.smaaEdgePostProcessMaterial );
+	openQ4_DrawFullScreenMaterial( gameRender.smaaEdgePostProcessMaterial );
 
 	// Pass 2: blending weight calculation into _postProcessAlbedo0.
 	renderSystem->BindRenderTexture( gameRender.postProcessRT[0], nullptr );
 	renderSystem->ClearRenderTarget( true, true, 1.0f, 0.0f, 0.0f, 0.0f );
-	OpenQ4_DrawFullScreenMaterial( gameRender.smaaWeightsPostProcessMaterial );
+	openQ4_DrawFullScreenMaterial( gameRender.smaaWeightsPostProcessMaterial );
 
 	// Pass 3: neighborhood blending into _postProcessAlbedo1, then copy the
 	// final SMAA output back into _postProcessAlbedo0 for the rest of the post stack.
 	renderSystem->BindRenderTexture( gameRender.postProcessRT[1], nullptr );
 	renderSystem->ClearRenderTarget( true, true, 1.0f, 0.0f, 0.0f, 0.0f );
-	OpenQ4_DrawFullScreenMaterial( gameRender.smaaBlendPostProcessMaterial );
+	openQ4_DrawFullScreenMaterial( gameRender.smaaBlendPostProcessMaterial );
 
 	// Normalize the SMAA result back to _postProcessAlbedo0 so blur, CAS, and
 	// the final present path keep a single post-process source contract.
 	renderSystem->BindRenderTexture( gameRender.postProcessRT[0], nullptr );
 	renderSystem->ClearRenderTarget( true, true, 1.0f, 0.0f, 0.0f, 0.0f );
-	OpenQ4_DrawFullScreenMaterial( gameRender.copyPostProcess1Material );
+	openQ4_DrawFullScreenMaterial( gameRender.copyPostProcess1Material );
 	renderSystem->BindRenderTexture( nullptr, nullptr );
 }
 
-static const idMaterial* OpenQ4_SelectFinalPostProcessMaterial( rvmGameRender_t& gameRender, bool blurEnabled ) {
+static const idMaterial* openQ4_SelectFinalPostProcessMaterial( rvmGameRender_t& gameRender, bool blurEnabled ) {
 	if ( blurEnabled ) {
 		return gameRender.blurPostProcessMaterial;
 	}
@@ -241,7 +241,7 @@ void idGameLocal::InitGameRenderSystem(void) {
 		return;
 	}
 
-	renderSystem->SetPortalSkyCaptureViewCallback( OpenQ4_BuildPortalSkyCaptureView );
+	renderSystem->SetPortalSkyCaptureViewCallback( openQ4_BuildPortalSkyCaptureView );
 
 	const int requestedMsaaSamples = Max( 0, cvarSystem->GetCVarInteger( "r_multiSamples" ) );
 
@@ -406,7 +406,7 @@ void idGameLocal::RenderScene(const renderView_t *view, idRenderWorld *renderWor
 
 	if ( !canUsePostProcess ) {
 		// Fallback for stock Quake 4 assets or transient render-target invalidation.
-		OpenQ4_RenderSceneDirect( view, renderWorld, portalSky, renderFlags );
+		openQ4_RenderSceneDirect( view, renderWorld, portalSky, renderFlags );
 		renderSystem->SetUseUIViewportFor2D( previousUIViewportMode );
 		return;
 	}
@@ -457,7 +457,7 @@ void idGameLocal::RenderScene(const renderView_t *view, idRenderWorld *renderWor
 
 	if ( canUseFastNoPost ) {
 		if ( g_renderFastNoPostDirect.GetBool() ) {
-			OpenQ4_RenderSceneDirect( view, renderWorld, portalSky, renderFlags );
+			openQ4_RenderSceneDirect( view, renderWorld, portalSky, renderFlags );
 			if ( g_renderCaptureCurrentRender.GetBool() ) {
 				renderSystem->CaptureRenderToImage( "_currentRender" );
 			}
@@ -465,16 +465,16 @@ void idGameLocal::RenderScene(const renderView_t *view, idRenderWorld *renderWor
 			return;
 		}
 
-		OpenQ4_BindSceneRenderTexture( gameRender.forwardRenderPassResolvedRT );
+		openQ4_BindSceneRenderTexture( gameRender.forwardRenderPassResolvedRT );
 		renderSystem->ClearRenderTarget( true, true, 1.0f, 0.0f, 0.0f, 0.0f );
-		OpenQ4_RenderSceneWorld( view, renderWorld, portalSky, renderFlags );
+		openQ4_RenderSceneWorld( view, renderWorld, portalSky, renderFlags );
 		renderSystem->BindRenderTexture( nullptr, nullptr );
 
 		// The no-post path previously copied _forwardRenderResolvedAlbedo through
 		// _postProcessAlbedo0 before presenting it. Presenting the resolved scene
 		// material directly removes two full-screen passes without changing pixels.
 		renderSystem->ClearRenderTarget( false, true, 1.0f, 0.0f, 0.0f, 0.0f );
-		OpenQ4_DrawFullScreenMaterial( gameRender.resolvePostProcessMaterial );
+		openQ4_DrawFullScreenMaterial( gameRender.resolvePostProcessMaterial );
 
 		if ( g_renderCaptureCurrentRender.GetBool() ) {
 			renderSystem->CaptureRenderToImage( "_currentRender" );
@@ -484,12 +484,12 @@ void idGameLocal::RenderScene(const renderView_t *view, idRenderWorld *renderWor
 	}
 
 	// Render the scene to the forward render pass rendertexture.
-	OpenQ4_BindSceneRenderTexture( gameRender.forwardRenderPassRT );
+	openQ4_BindSceneRenderTexture( gameRender.forwardRenderPassRT );
 	{
 		// Clear the color/depth buffers
 		renderSystem->ClearRenderTarget(true, true, 1.0f, 0.0f, 0.0f, 0.0f);
 	
-		OpenQ4_RenderSceneWorld( view, renderWorld, portalSky, renderFlags );
+		openQ4_RenderSceneWorld( view, renderWorld, portalSky, renderFlags );
 	}
 	renderSystem->BindRenderTexture(nullptr, nullptr);
 
@@ -503,15 +503,15 @@ void idGameLocal::RenderScene(const renderView_t *view, idRenderWorld *renderWor
 	idRenderTexture* resolvePostProcessRT = useSMAA ? gameRender.postProcessRT[2] : gameRender.postProcessRT[0];
 	renderSystem->BindRenderTexture(resolvePostProcessRT, nullptr);
 		renderSystem->ClearRenderTarget( true, true, 1.0f, 0.0f, 0.0f, 0.0f );
-		OpenQ4_DrawFullScreenMaterial( gameRender.resolvePostProcessMaterial );
+		openQ4_DrawFullScreenMaterial( gameRender.resolvePostProcessMaterial );
 	renderSystem->BindRenderTexture( nullptr, nullptr );
 	if ( useSMAA ) {
-		OpenQ4_ApplySMAA( gameRender );
+		openQ4_ApplySMAA( gameRender );
 	}
 
-	const idMaterial* finalMaterial = OpenQ4_SelectFinalPostProcessMaterial( gameRender, blurEnabled );
+	const idMaterial* finalMaterial = openQ4_SelectFinalPostProcessMaterial( gameRender, blurEnabled );
 	if ( finalMaterial == NULL ) {
-		OpenQ4_RenderSceneDirect( view, renderWorld, portalSky, renderFlags );
+		openQ4_RenderSceneDirect( view, renderWorld, portalSky, renderFlags );
 		renderSystem->SetUseUIViewportFor2D( previousUIViewportMode );
 		return;
 	}
@@ -519,7 +519,7 @@ void idGameLocal::RenderScene(const renderView_t *view, idRenderWorld *renderWor
 	// SS_POST_PROCESS stages use depth testing; reset backbuffer depth each frame
 	// so final full-screen composition is deterministic across drivers/devices.
 	renderSystem->ClearRenderTarget( false, true, 1.0f, 0.0f, 0.0f, 0.0f );
-	OpenQ4_DrawFullScreenMaterial( finalMaterial );
+	openQ4_DrawFullScreenMaterial( finalMaterial );
 
 	if ( g_renderCaptureCurrentRender.GetBool() ) {
 		renderSystem->CaptureRenderToImage( "_currentRender" );
