@@ -1025,18 +1025,205 @@ void Cmd_GetViewpos_f( const idCmdArgs &args ) {
 
 /*
 =================
+Cmd_NormalizeLevelshotMapDeclPath
+=================
+*/
+static void Cmd_NormalizeLevelshotMapDeclPath( const char *mapPath, idStr &normalizedPath ) {
+	normalizedPath = ( mapPath != NULL ) ? mapPath : "";
+	normalizedPath.BackSlashesToSlashes();
+	normalizedPath.Strip( ' ' );
+	normalizedPath.Strip( '\t' );
+	normalizedPath.StripTrailingWhitespace();
+	normalizedPath.StripQuotes();
+	normalizedPath.StripFileExtension();
+
+	if ( !idStr::Icmpn( normalizedPath.c_str(), "maps/", 5 ) ) {
+		normalizedPath = normalizedPath.c_str() + 5;
+	}
+}
+
+/*
+=================
+Cmd_NormalizeLevelshotEntityFilterToken
+=================
+*/
+static void Cmd_NormalizeLevelshotEntityFilterToken( const char *entityFilter, idStr &normalizedFilter ) {
+	normalizedFilter = ( entityFilter != NULL ) ? entityFilter : "";
+	normalizedFilter.Strip( ' ' );
+	normalizedFilter.Strip( '\t' );
+	normalizedFilter.StripTrailingWhitespace();
+	normalizedFilter.StripQuotes();
+}
+
+/*
+=================
+Cmd_IsLevelshotMapFilterWhitespace
+=================
+*/
+static bool Cmd_IsLevelshotMapFilterWhitespace( const char ch ) {
+	return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n';
+}
+
+/*
+=================
+Cmd_NormalizeLevelshotMapPathAndEntityFilter
+=================
+*/
+static void Cmd_NormalizeLevelshotMapPathAndEntityFilter( const char *mapPath, const char *entityFilter, idStr &normalizedMapPath, idStr &normalizedEntityFilter ) {
+	idStr mapToken = ( mapPath != NULL ) ? mapPath : "";
+	mapToken.BackSlashesToSlashes();
+	mapToken.Strip( ' ' );
+	mapToken.Strip( '\t' );
+	mapToken.StripTrailingWhitespace();
+	mapToken.StripQuotes();
+
+	Cmd_NormalizeLevelshotEntityFilterToken( entityFilter, normalizedEntityFilter );
+
+	int split = -1;
+	for ( int i = mapToken.Length() - 1; i >= 0; --i ) {
+		if ( Cmd_IsLevelshotMapFilterWhitespace( mapToken[ i ] ) ) {
+			split = i;
+			break;
+		}
+	}
+
+	if ( split > 0 ) {
+		idStr mapPart = mapToken.Left( split );
+		idStr filterPart = mapToken.Right( mapToken.Length() - split - 1 );
+		idStr normalizedFilterPart;
+		mapPart.Strip( ' ' );
+		mapPart.Strip( '\t' );
+		mapPart.StripTrailingWhitespace();
+		mapPart.StripQuotes();
+		Cmd_NormalizeLevelshotEntityFilterToken( filterPart.c_str(), normalizedFilterPart );
+
+		if ( mapPart.Length() > 0 && normalizedFilterPart.Length() > 0 ) {
+			mapToken = mapPart;
+			if ( normalizedEntityFilter.Length() == 0 ) {
+				normalizedEntityFilter = normalizedFilterPart;
+			}
+		}
+	}
+
+	Cmd_NormalizeLevelshotMapDeclPath( mapToken.c_str(), normalizedMapPath );
+}
+
+/*
+=================
+Cmd_GetLevelshotMapDeclForNormalizedPath
+=================
+*/
+static bool Cmd_GetLevelshotMapDeclForNormalizedPath( const idStr &normalizedPath, idDict &outMapDecl ) {
+	if ( normalizedPath.Length() == 0 ) {
+		return false;
+	}
+
+	const idDecl *mapDecl = declManager->FindType( DECL_MAPDEF, normalizedPath.c_str(), false );
+	const idDeclEntityDef *mapDef = static_cast<const idDeclEntityDef *>( mapDecl );
+	if ( mapDef != NULL ) {
+		outMapDecl = mapDef->dict;
+		outMapDecl.Set( "path", mapDef->GetName() );
+		return true;
+	}
+
+	const int numMaps = fileSystem->GetNumMaps();
+	for ( int i = 0; i < numMaps; ++i ) {
+		const idDict *candidate = fileSystem->GetMapDecl( i );
+		if ( candidate == NULL ) {
+			continue;
+		}
+
+		idStr candidatePath;
+		Cmd_NormalizeLevelshotMapDeclPath( candidate->GetString( "path" ), candidatePath );
+		if ( candidatePath.Length() == 0 ) {
+			continue;
+		}
+
+		if ( !idStr::Icmp( normalizedPath.c_str(), candidatePath.c_str() ) ) {
+			outMapDecl = *candidate;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/*
+=================
+Cmd_GetLevelshotMapDecl
+=================
+*/
+static bool Cmd_GetLevelshotMapDecl( const char *mapPath, const char *entityFilter, idDict &outMapDecl ) {
+	outMapDecl.Clear();
+
+	idStr normalizedPath;
+	idStr normalizedEntityFilter;
+	Cmd_NormalizeLevelshotMapPathAndEntityFilter( mapPath, entityFilter, normalizedPath, normalizedEntityFilter );
+	if ( normalizedPath.Length() == 0 ) {
+		return false;
+	}
+
+	if ( normalizedEntityFilter.Length() > 0 ) {
+		idStr filteredPath = normalizedPath;
+		filteredPath += "_";
+		filteredPath += normalizedEntityFilter;
+		filteredPath.Strip( ' ' );
+		filteredPath.Strip( '\t' );
+		filteredPath.StripTrailingWhitespace();
+		filteredPath.StripQuotes();
+		filteredPath.BackSlashesToSlashes();
+		filteredPath.Replace( " ", "_" );
+		if ( Cmd_GetLevelshotMapDeclForNormalizedPath( filteredPath, outMapDecl ) ) {
+			return true;
+		}
+	}
+
+	if ( Cmd_GetLevelshotMapDeclForNormalizedPath( normalizedPath, outMapDecl ) ) {
+		return true;
+	}
+
+	if ( normalizedEntityFilter.Length() == 0 ) {
+		idStr firstSegmentPath = normalizedPath;
+		firstSegmentPath += "_first";
+		if ( Cmd_GetLevelshotMapDeclForNormalizedPath( firstSegmentPath, outMapDecl ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/*
+=================
 Cmd_GetLevelshotBaseName
 =================
 */
 static bool Cmd_GetLevelshotBaseName( const idCmdArgs &args, idStr &baseName ) {
-	idStr mapName;
-
-	if ( args.Argc() > 2 ) {
+	if ( args.Argc() > 3 ) {
 		return false;
 	}
 
+	const char *mapPath = ( args.Argc() == 1 ) ? gameLocal.GetMapName() : args.Argv( 1 );
+	const char *entityFilter = "";
 	if ( args.Argc() == 1 ) {
-		mapName = gameLocal.GetMapName();
+		entityFilter = gameLocal.serverInfo.GetString( "si_entityFilter", "" );
+	} else if ( args.Argc() == 3 ) {
+		entityFilter = args.Argv( 2 );
+	}
+
+	idDict mapDeclDict;
+	if ( Cmd_GetLevelshotMapDecl( mapPath, entityFilter, mapDeclDict ) ) {
+		const char *loadImage = mapDeclDict.GetString( "loadimage", "" );
+		if ( loadImage[0] != '\0' ) {
+			baseName = loadImage;
+			baseName.BackSlashesToSlashes();
+			baseName.StripFileExtension();
+			return true;
+		}
+	}
+
+	if ( args.Argc() == 1 ) {
+		idStr mapName = mapPath;
 		mapName.StripPath();
 		mapName.StripFileExtension();
 		if ( mapName.Length() <= 0 ) {
@@ -1047,6 +1234,17 @@ static bool Cmd_GetLevelshotBaseName( const idCmdArgs &args, idStr &baseName ) {
 	}
 
 	baseName = args.Argv( 1 );
+	if ( args.Argc() == 3 ) {
+		idStr normalizedPath;
+		idStr normalizedEntityFilter;
+		Cmd_NormalizeLevelshotMapPathAndEntityFilter( args.Argv( 1 ), args.Argv( 2 ), normalizedPath, normalizedEntityFilter );
+		if ( normalizedPath.Length() > 0 && normalizedEntityFilter.Length() > 0 ) {
+			baseName = normalizedPath;
+			baseName += "_";
+			baseName += normalizedEntityFilter;
+			baseName.StripPath();
+		}
+	}
 	baseName.StripFileExtension();
 	if ( baseName.Find( "/", false ) < 0 && baseName.Find( ":", false ) < 0 ) {
 		baseName = va( "gfx/guis/loadscreens/%s", baseName.c_str() );
@@ -1074,7 +1272,7 @@ void Cmd_GotoLevelshot_f( const idCmdArgs &args ) {
 	}
 
 	if ( !Cmd_GetLevelshotBaseName( args, levelshotFile ) ) {
-		gameLocal.Printf( "usage: gotolevelshot [mapname]\n" );
+		gameLocal.Printf( "usage: gotolevelshot [levelshot|mapname [first|second]]\n" );
 		return;
 	}
 
@@ -1093,8 +1291,10 @@ void Cmd_GotoLevelshot_f( const idCmdArgs &args ) {
 		return;
 	}
 
+	player->noclip = true;
 	origin.z -= pm_normalviewheight.GetFloat() - 0.25f;
 	player->Teleport( origin, angles, NULL );
+	gameLocal.Printf( "Moved to levelshot pose: %s (noclip ON)\n", levelshotFile.c_str() );
 }
 
 /*
