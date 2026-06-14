@@ -641,6 +641,7 @@ void idActor::Spawn( void ) {
 		flashlight.up		= spawnArgs.GetVector( "flashlightUp" );
 		flashlight.right	= spawnArgs.GetVector( "flashlightRight" );
 		flashlight.end		= spawnArgs.GetVector( "flashlightTarget" );
+		rvNormalizeProjectedRenderLight( flashlight, GetName(), "actor-flashlight" );
 	}
 	
 	spawnArgs.GetVector ( "flashlightOffset", "0 0 0", flashlightOffset );
@@ -1010,6 +1011,7 @@ void idActor::Restore( idRestoreGame *savefile ) {
 	savefile->ReadVec3 ( flashlightOffset );
 	savefile->ReadRenderLight ( flashlight );
 	if ( flashlightHandle != -1 ) {		
+		rvNormalizeProjectedRenderLight( flashlight, GetName(), "actor-flashlight" );
 		flashlightHandle = gameRenderWorld->AddLightDef( &flashlight );
 	}
 

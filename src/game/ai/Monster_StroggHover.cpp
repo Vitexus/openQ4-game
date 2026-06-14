@@ -285,6 +285,7 @@ void rvMonsterStroggHover::StartHeadlight( void )
 					renderLight.up	   = spawnArgs.GetVector( "light_up" );
 					renderLight.right  = spawnArgs.GetVector( "light_right" );
 					renderLight.end	   = spawnArgs.GetVector( "light_target" );;
+					rvNormalizeProjectedRenderLight( renderLight, GetName(), "strogg-hover-headlight" );
 				}
 
 				//lightOn = spawnArgs.GetBool( "start_on", "1" );
@@ -681,6 +682,7 @@ void rvMonsterStroggHover::Restore ( idRestoreGame *savefile ) {
 	savefile->ReadInt ( lightHandle );
 	if ( lightHandle != -1 ) {
 		//get the handle again as it's out of date after a restore!
+		rvNormalizeProjectedRenderLight( renderLight, GetName(), "strogg-hover-headlight" );
 		lightHandle = gameRenderWorld->AddLightDef( &renderLight );
 	}
 

@@ -104,6 +104,7 @@ class idLocationEntity;
 //============================================================================
 
 void gameError( const char *fmt, ... );
+void rvNormalizeProjectedRenderLight( renderLight_t &light, const char *ownerName, const char *lightName );
 
 #include "gamesys/Event.h"
 // RAVEN BEGIN

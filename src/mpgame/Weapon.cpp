@@ -856,6 +856,7 @@ void rvWeapon::InitLights ( void ) {
 			light->up	  = spawnArgs.GetVector ( "flashUp" );
 			light->right  = spawnArgs.GetVector ( "flashRight" );
 			light->end    = light->target;
+			rvNormalizeProjectedRenderLight( *light, owner ? owner->GetName() : weaponDef->GetName(), "weapon-muzzle-flash" );
 		}
 		light->lightId = WPLIGHT_MUZZLEFLASH * 100 + owner->entityNumber;
 		light->allowLightInViewID = owner->entityNumber+1;
@@ -895,6 +896,7 @@ void rvWeapon::InitLights ( void ) {
 			light->up		= spawnArgs.GetVector( "flashlightUp" );
 			light->right	= spawnArgs.GetVector( "flashlightRight" );
 			light->end		= light->target;
+			rvNormalizeProjectedRenderLight( *light, owner ? owner->GetName() : weaponDef->GetName(), "weapon-flashlight" );
 		}
 		
 		light->allowLightInViewID = owner->entityNumber+1;
@@ -1532,6 +1534,7 @@ void rvWeapon::Restore ( idRestoreGame *savefile ) {
 		savefile->ReadRenderLight( lights[i] );
 		if ( lightHandles[i] != -1 ) {
 			//get the handle again as it's out of date after a restore!
+			rvNormalizeProjectedRenderLight( lights[i], owner ? owner->GetName() : weaponDef->GetName(), "weapon-restored-light" );
 			lightHandles[i] = gameRenderWorld->AddLightDef ( &lights[i] );
 		}
 	}

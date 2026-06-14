@@ -56,6 +56,63 @@ idRenderWorld *				gameRenderWorld = NULL;		// all drawing is done to this world
 
 static gameExport_t			gameExport;
 
+static bool rvProjectedLightFloatValid( const float value ) {
+	return !FLOAT_IS_NAN( value ) && !FLOAT_IS_INF( value );
+}
+
+static bool rvProjectedLightVecFinite( const idVec3 &value ) {
+	return rvProjectedLightFloatValid( value[0] ) && rvProjectedLightFloatValid( value[1] ) && rvProjectedLightFloatValid( value[2] );
+}
+
+static bool rvProjectedLightVecUsable( const idVec3 &value ) {
+	static const float VECTOR_EPSILON_SQR = 1.0e-6f;
+	return rvProjectedLightVecFinite( value ) && value.LengthSqr() > VECTOR_EPSILON_SQR;
+}
+
+void rvNormalizeProjectedRenderLight( renderLight_t &light, const char *ownerName, const char *lightName ) {
+	if ( light.pointLight ) {
+		return;
+	}
+
+	const bool targetValid = rvProjectedLightVecUsable( light.target );
+	const bool rightValid = rvProjectedLightVecUsable( light.right );
+	const bool upValid = rvProjectedLightVecUsable( light.up );
+
+	if ( targetValid ) {
+		if ( !rvProjectedLightVecFinite( light.start ) ) {
+			light.start.Zero();
+		}
+		if ( !rvProjectedLightVecUsable( light.end ) || !rvProjectedLightVecUsable( light.end - light.start ) ) {
+			light.end = light.target;
+		}
+	}
+
+	const bool depthValid = rvProjectedLightVecFinite( light.start ) && rvProjectedLightVecUsable( light.end - light.start );
+	const bool basisValid = rightValid && upValid && rvProjectedLightVecUsable( light.up.Cross( light.right ) );
+
+	if ( targetValid && basisValid && depthValid ) {
+		return;
+	}
+
+	gameLocal.Warning(
+		"Projected render light '%s' on '%s' has invalid projection vectors target=%s right=%s up=%s start=%s end=%s; demoting to point light",
+		( lightName && lightName[0] ) ? lightName : "<unnamed>",
+		( ownerName && ownerName[0] ) ? ownerName : "<unknown>",
+		light.target.ToString( 2 ),
+		light.right.ToString( 2 ),
+		light.up.ToString( 2 ),
+		light.start.ToString( 2 ),
+		light.end.ToString( 2 )
+	);
+
+	light.pointLight = true;
+	light.target.Zero();
+	light.right.Zero();
+	light.up.Zero();
+	light.start.Zero();
+	light.end.Zero();
+}
+
 idCVar g_airdefense1SkipProbe( "g_airdefense1SkipProbe", "0", CVAR_GAME | CVAR_BOOL, "temporary: auto-skip airdefense1 after one second using the ESC cinematic-skip path, log intro-to-spawn timings, and quit one frame after the player becomes live" );
 idCVar g_airdefense1SkipProbeProfile( "g_airdefense1SkipProbeProfile", "0", CVAR_GAME | CVAR_BOOL, "temporary: when g_airdefense1SkipProbe is enabled, collect coarse skip profiling buckets and top entity think totals" );
 
@@ -1573,6 +1630,11 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 	MEM_SCOPED_TAG(tag,MA_PARSER);
 // RAVEN END
 	bool sameMap = (mapFile && idStr::Icmp(mapFile->GetName(), mapName) == 0);
+	const int loadStartMsec = Sys_Milliseconds();
+	int phaseStartMsec = loadStartMsec;
+	int mapParseMsec = 0;
+	int mapResolveMsec = 0;
+	int collisionMsec = 0;
 
 	networkSystem->SetLoadingText( mapName );
 
@@ -1595,10 +1657,13 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 			mapFile = NULL;
 			Error( "Couldn't load %s", mapName );
 		}
+		mapParseMsec = Sys_Milliseconds() - phaseStartMsec;
+		phaseStartMsec = Sys_Milliseconds();
 // RAVEN BEGIN
 // rjohnson: added resolve for handling func_groups and other aspects.  Before, radiant would do this processing on a map destroying the original data
 		mapFile->Resolve();
 // RAVEN END
+		mapResolveMsec = Sys_Milliseconds() - phaseStartMsec;
 	}
 	mapFileName = mapFile->GetName();
 	
@@ -1621,7 +1686,17 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 
 	// load the collision map
 	networkSystem->SetLoadingText( common->GetLocalizedString( "#str_107668" ) );
+	phaseStartMsec = Sys_Milliseconds();
 	collisionModelManager->LoadMap( mapFile, false );
+	collisionMsec = Sys_Milliseconds() - phaseStartMsec;
+	if ( cvarSystem->GetCVarBool( "com_showLevelLoadTimes" ) ) {
+		Printf(
+			"Game LoadMap phases: mapParse=%d mapResolve=%d collision=%d total=%d msec\n",
+			mapParseMsec,
+			mapResolveMsec,
+			collisionMsec,
+			Sys_Milliseconds() - loadStartMsec );
+	}
 
 	numClients = 0;
 
@@ -2172,6 +2247,14 @@ idGameLocal::InitFromNewMap
 void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorld, bool isServer, bool isClient, int randseed ) {
 
 	TIME_THIS_SCOPE( __FUNCLINE__);
+	const int initStartMsec = Sys_Milliseconds();
+	int phaseStartMsec = initStartMsec;
+	int startupMsec = 0;
+	int loadMapMsec = 0;
+	int scriptMsec = 0;
+	int populateMsec = 0;
+	int mpPrecacheMsec = 0;
+	int animationFlushMsec = 0;
 	
 	this->isServer = isServer;
 	this->isClient = isClient;
@@ -2230,15 +2313,25 @@ void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorl
 	SetGameType();
 // RAVEN END
 
+	startupMsec = Sys_Milliseconds() - phaseStartMsec;
+	phaseStartMsec = Sys_Milliseconds();
 	LoadMap( mapName, randseed );
+	loadMapMsec = Sys_Milliseconds() - phaseStartMsec;
+	phaseStartMsec = Sys_Milliseconds();
 
 	InitScriptForMap();
+	scriptMsec = Sys_Milliseconds() - phaseStartMsec;
+	phaseStartMsec = Sys_Milliseconds();
 
 	MapPopulate();
+	populateMsec = Sys_Milliseconds() - phaseStartMsec;
+	phaseStartMsec = Sys_Milliseconds();
 
 	mpGame.Reset();
 
 	mpGame.Precache();
+	mpPrecacheMsec = Sys_Milliseconds() - phaseStartMsec;
+	phaseStartMsec = Sys_Milliseconds();
 
 // RAVEN BEGIN
 // mwhitlock: Dynamic memory consolidation
@@ -2252,6 +2345,18 @@ void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorl
 // jsinger: animationLib changed to a pointer
 	animationLib->FlushUnusedAnims();
 // RAVEN END
+	animationFlushMsec = Sys_Milliseconds() - phaseStartMsec;
+	if ( cvarSystem->GetCVarBool( "com_showLevelLoadTimes" ) ) {
+		Printf(
+			"Game init phases: startup=%d loadMap=%d script=%d populate=%d mpPrecache=%d animationFlush=%d total=%d msec\n",
+			startupMsec,
+			loadMapMsec,
+			scriptMsec,
+			populateMsec,
+			mpPrecacheMsec,
+			animationFlushMsec,
+			Sys_Milliseconds() - initStartMsec );
+	}
 
 // jmarshall
 	if (botItemTable && gameLocal.IsMultiplayer() && gameLocal.isServer)
@@ -3076,10 +3181,7 @@ void idGameLocal::CacheDictionaryMedia( const idDict *dict ) {
 				// precache the render model
 				renderModelManager->FindModel( kv->GetValue() );
 				// precache .cm files only
-// jmarshall: caching code is different in the legacy engine
-				//collisionModelManager->PreCacheModel( GetMapName(), kv->GetValue() );
-				collisionModelManager->LoadModel(GetMapName(), kv->GetValue(), true);
-// jmarshall end
+				collisionModelManager->PreCacheModel( GetMapName(), kv->GetValue() );
 			}
 		} else if ( MATCH( "s_shader" ) ) {
 			

@@ -392,6 +392,12 @@ public:
 	// Resizes a render texture to the specified width and height.
 	virtual void			ResizeRenderTexture( idRenderTexture *renderTexture, int width, int height ) = 0;
 
+	// Fills in the dimensions for the given render texture.
+	virtual void			GetRenderTextureSize( idRenderTexture *renderTexture, int &renderTextureWidth, int &renderTextureHeight ) = 0;
+
+	// Sets a debug label on the render texture and its attachments when GL object labels are available.
+	virtual void			SetRenderTextureDebugName( idRenderTexture *renderTexture, const char *label ) = 0;
+
 	// Binds the specified render texture; NULL targets the back buffer.
 	virtual void			BindRenderTexture( idRenderTexture *renderTexture, idRenderTexture *feedbackRenderTexture ) = 0;
 
@@ -400,6 +406,15 @@ public:
 
 	// Clears the current render target.
 	virtual void			ClearRenderTarget( bool clearColor, bool clearDepth, float depthValue, float red, float green, float blue ) = 0;
+
+	// Sets the source dimensions used by post-process shader parameter bindings.
+	virtual void			SetPostProcessSourceSize( int width, int height ) = 0;
+
+	// Sets the source colour-space contract used by post-process shader parameter bindings.
+	virtual void			SetPostProcessSourceColorSpace( const idVec4 &colorSpace ) = 0;
+
+	// Sets the SMAA quality contract used by post-process shader parameter bindings.
+	virtual void			SetPostProcessSMAAQuality( const idVec4 &quality ) = 0;
 
 	// Controls whether fullscreen 2D submissions target the UI viewport sub-rect.
 	virtual void			SetUseUIViewportFor2D( bool enable ) = 0;

@@ -407,6 +407,7 @@ void rvVehicleLight::Spawn ( void ) {
 		renderLight.up	   = spawnArgs.GetVector( "up" );
 		renderLight.right  = spawnArgs.GetVector( "right" );
 		renderLight.end	   = spawnArgs.GetVector( "target" );;
+		rvNormalizeProjectedRenderLight( renderLight, parent ? parent->GetName() : "<vehicle>", "vehicle-light" );
 	}
 
 	// Hide flare surface if there is one
@@ -563,6 +564,7 @@ void rvVehicleLight::Restore ( idRestoreGame* savefile ) {
 	savefile->ReadInt ( lightHandle );
 	if ( lightHandle != -1 ) {
 		//get the handle again as it's out of date after a restore!
+		rvNormalizeProjectedRenderLight( renderLight, parent ? parent->GetName() : "<vehicle>", "vehicle-light" );
 		lightHandle = gameRenderWorld->AddLightDef( &renderLight );
 	}
 
@@ -689,6 +691,7 @@ void rvVehicleWeapon::Spawn ( void ) {
 		muzzleFlash.up		= spawnArgs.GetVector( "flashUp" );
 		muzzleFlash.right	= spawnArgs.GetVector( "flashRight" );
 		muzzleFlash.end		= spawnArgs.GetVector( "flashTarget" );
+		rvNormalizeProjectedRenderLight( muzzleFlash, parent ? parent->GetName() : "<vehicle>", "vehicle-muzzle-flash" );
 	}
 	
 	shaderFire = declManager->FindSound ( spawnArgs.GetString ( "snd_fire" ), false );
@@ -1080,6 +1083,7 @@ void rvVehicleWeapon::Restore ( idRestoreGame* savefile ) {
 	savefile->ReadInt ( muzzleFlashHandle );
 	if ( muzzleFlashHandle != -1 ) {
 		//get the handle again as it's out of date after a restore!
+		rvNormalizeProjectedRenderLight( muzzleFlash, parent ? parent->GetName() : "<vehicle>", "vehicle-muzzle-flash" );
 		muzzleFlashHandle = gameRenderWorld->AddLightDef( &muzzleFlash );
 	}
 
