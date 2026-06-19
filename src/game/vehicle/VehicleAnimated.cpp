@@ -13,6 +13,10 @@
 CLASS_DECLARATION( rvVehicle, rvVehicleAnimated )
 END_CLASS
 
+static bool OpenQ4_TurboVehicleSpeedsActive( void ) {
+	return g_turboMode.GetBool() && !gameLocal.isMultiplayer;
+}
+
 rvVehicleAnimated::rvVehicleAnimated ( void ) {
 }
 
@@ -92,6 +96,9 @@ void rvVehicleAnimated::Think ( void ) {
 	viewAngles.Normalize360();
 	animator.GetDelta( gameLocal.time - gameLocal.GetMSec(), gameLocal.time, delta );
 	delta += additionalDelta;
+	if ( OpenQ4_TurboVehicleSpeedsActive() && positions[0].IsOccupied() && IsMovementEnabled() ) {
+		delta *= OPENQ4_TURBO_VEHICLE_SPEED_SCALE;
+	}
 
 	idStr alignmentJoint;
 	if ( g_vehicleMode.GetInteger() != 0 && spawnArgs.GetString( "alignment_joint", 0, alignmentJoint ) ) {

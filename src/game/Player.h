@@ -43,7 +43,10 @@ const int	CARRYOVER_FLAG_ARMOR_HEAVY	= 0x10000000;
 const int	CARRYOVER_WEAPONS_MASK		= 0x0FFFFFFF;
 const int	CARRYOVER_FLAGS_MASK		= 0xF0000000;
 
-const int	MAX_SKILL_LEVELS			= 4;
+const int	MAX_SKILL_LEVELS			= 5;
+
+const float	OPENQ4_TURBO_MOVE_SCALE			= 1.25f;
+const float	OPENQ4_TURBO_VEHICLE_SPEED_SCALE	= 2.0f;
 
 const int	ZERO_VOLUME					= -40;			// volume at zero
 const int	DMG_VOLUME					= 5;			// volume when taking damage

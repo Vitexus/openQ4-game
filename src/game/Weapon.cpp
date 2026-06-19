@@ -15,6 +15,10 @@
 #include "client/ClientEffect.h"
 //#include "../renderer/tr_local.h"
 
+static bool OpenQ4_TurboWeaponReloadsDisabled( void ) {
+	return g_turboMode.GetBool() && !gameLocal.isMultiplayer;
+}
+
 int rvWeapon::GetFirstPersonShadowSuppressLightId( void ) const {
 	if ( owner == NULL ) {
 		return 0;
@@ -1796,6 +1800,10 @@ NOTE: this is only for impulse-triggered reload, auto reload is scripted
 ================
 */
 void rvWeapon::Reload( void ) {
+	if ( OpenQ4_TurboWeaponReloadsDisabled() ) {
+		wsfl.reload = false;
+		return;
+	}
 	if ( clipSize ) {
 		wsfl.reload = true;
 	}
@@ -1817,6 +1825,10 @@ rvWeapon::AutoReload
 */
 bool rvWeapon::AutoReload ( void ) {
 	assert( owner );
+
+	if ( OpenQ4_TurboWeaponReloadsDisabled() ) {
+		return false;
+	}
 
  	// on a network client, never predict reloads of other clients. wait for the server
  	if ( gameLocal.isClient ) {
@@ -2399,6 +2411,9 @@ rvWeapon::AmmoInClip
 ================
 */
 int rvWeapon::AmmoInClip( void ) const {
+	if ( OpenQ4_TurboWeaponReloadsDisabled() ) {
+		return AmmoAvailable();
+	}
 	if ( !clipSize ) {
 		return AmmoAvailable();
 	}
@@ -2429,6 +2444,9 @@ rvWeapon::ClipSize
 ================
 */
 int	rvWeapon::ClipSize( void ) const {
+	if ( OpenQ4_TurboWeaponReloadsDisabled() ) {
+		return 0;
+	}
 	return clipSize;
 }
 
@@ -2481,7 +2499,7 @@ rvWeapon::UseAmmo
 */
 void rvWeapon::UseAmmo ( int amount ) {
 	owner->inventory.UseAmmo( ammoType, amount * ammoRequired );
-	if ( clipSize && ammoRequired ) {
+	if ( clipSize && ammoRequired && !OpenQ4_TurboWeaponReloadsDisabled() ) {
 		ammoClip -= ( amount * ammoRequired );
 		if ( ammoClip < 0 ) {
 			ammoClip = 0;
@@ -2550,13 +2568,14 @@ void rvWeapon::Attack( bool altAttack, int num_attacks, float spread, float fuse
 	// avoid all ammo considerations on an MP client
 	if ( !gameLocal.isClient ) {
 		// check if we're out of ammo or the clip is empty
+		const bool noReload = OpenQ4_TurboWeaponReloadsDisabled();
 		int ammoAvail = owner->inventory.HasAmmo( ammoType, ammoRequired );
-		if ( !ammoAvail || ( ( clipSize != 0 ) && ( ammoClip <= 0 ) ) ) {
+		if ( !ammoAvail || ( !noReload && ( clipSize != 0 ) && ( ammoClip <= 0 ) ) ) {
 			return;
 		}
 
 		owner->inventory.UseAmmo( ammoType, ammoRequired );
-		if ( clipSize && ammoRequired ) {
+		if ( clipSize && ammoRequired && !noReload ) {
  			clipPredictTime = gameLocal.time;	// mp client: we predict this. mark time so we're not confused by snapshots
 			ammoClip -= 1;
 		}

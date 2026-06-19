@@ -9,11 +9,12 @@ if cpp.get_id() != 'msvc'
   error('openQ4-GameLibs Meson build requires MSVC cl.exe.')
 endif
 
-if host_machine.cpu_family() != 'x86'
-  error('openQ4-GameLibs Meson build requires an x86 (32-bit) toolchain. Use an x86 Visual Studio environment.')
+host_cpu_family = host_machine.cpu_family()
+if not ['x86', 'x86_64'].contains(host_cpu_family)
+  error('openQ4-GameLibs Meson build currently supports x86 and x64 MSVC toolchains.')
 endif
 
-game_arch = host_machine.cpu_family()
+game_arch = host_cpu_family == 'x86_64' ? 'x64' : 'x86'
 sp_module_name = 'game-sp_' + game_arch
 mp_module_name = 'game-mp_' + game_arch
 
@@ -70,12 +71,26 @@ foreach define : common_defines
   common_define_args += '/D' + define
 endforeach
 
+idlib_excludes = [
+  'idlib/math/Simd_AltiVec.cpp',
+]
+
+if host_cpu_family == 'x86_64'
+  idlib_excludes += [
+    'idlib/math/Simd_3DNow.cpp',
+    'idlib/math/Simd_MMX.cpp',
+    'idlib/math/Simd_SSE.cpp',
+    'idlib/math/Simd_SSE2.cpp',
+    'idlib/math/Simd_SSE3.cpp',
+  ]
+endif
+
 idlib_source_output = run_command(
   py,
   source_lister,
   source_root,
   'idlib',
-  'idlib/math/Simd_AltiVec.cpp',
+  idlib_excludes,
   check : true,
 ).stdout().strip().split('\n')
 
@@ -97,9 +112,14 @@ idlib = static_library(
 
 module_link_args = [
   '/FIXED:NO',
-  '/BASE:0x20000000',
   '/LARGEADDRESSAWARE',
 ]
+
+if host_cpu_family == 'x86_64'
+  module_link_args += ['/BASE:0x180000000']
+else
+  module_link_args += ['/BASE:0x20000000']
+endif
 
 if release_like
   module_link_args += [
@@ -185,6 +205,7 @@ summary(
     'Build Type': get_option('buildtype'),
     'Build SP Game': get_option('build_spgame'),
     'Build MP Game': get_option('build_mpgame'),
+    'Game Module Arch': game_arch,
     'Inline Debug': get_option('inline_debug') and not release_like,
     'Legacy Include': mssdk_include == '' ? '(disabled)' : mssdk_include,
   },

@@ -6800,9 +6800,14 @@ idGameLocal::SpawnClientMoveable
 ======================
 */
 void idGameLocal::SpawnClientMoveable( const char* name, int lifetime, const idVec3& origin, const idMat3& axis, const idVec3& velocity, const idVec3& angular_velocity ) {
+	const bool debugDebris = cvarSystem && cvarSystem->GetCVarInteger( "bse_debug" ) > 0;
+
 	// find the debris def
 	const idDict* args = gameLocal.FindEntityDefDict( name, false );
 	if ( !args ) {
+		if ( debugDebris ) {
+			common->Warning( "BSE debris: entityDef '%s' not found", name ? name : "" );
+		}
 		return;
 	}
 
@@ -6819,7 +6824,14 @@ void idGameLocal::SpawnClientMoveable( const char* name, int lifetime, const idV
 	SpawnClientEntityDef( *args, (rvClientEntity**)(&cent), false, "rvClientMoveable" );
 	
 	if( !cent ) {
+		if ( debugDebris ) {
+			common->Warning( "BSE debris: failed to spawn client moveable '%s'", name ? name : "" );
+		}
 		return;
+	}
+
+	if ( debugDebris ) {
+		common->Printf( "BSE debris: spawned client moveable '%s' lifetime=%d\n", name ? name : "", lifetime );
 	}
  
 	cent->SetOrigin( origin );

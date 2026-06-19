@@ -292,7 +292,7 @@ rvMonsterStroggFlyer::State_Killed
 ================
 */
 stateResult_t rvMonsterStroggFlyer::State_Killed ( const stateParms_t& parms ) {
-	PlayEffect ( "fx_death", GetPhysics()->GetOrigin(), (-GetPhysics()->GetGravityNormal()).ToMat3() );
+	gameLocal.PlayEffect ( spawnArgs, "fx_death", GetPhysics()->GetOrigin(), (-GetPhysics()->GetGravityNormal()).ToMat3() );
 	return idAI::State_Killed ( parms );
 }
 

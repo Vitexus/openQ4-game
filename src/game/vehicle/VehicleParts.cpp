@@ -14,6 +14,14 @@
 #include "VehicleParts.h"
 #include "../ai/AI_Manager.h"
 
+static bool OpenQ4_TurboVehicleSpeedsActive( void ) {
+	return g_turboMode.GetBool() && !gameLocal.isMultiplayer;
+}
+
+static float OpenQ4_TurboVehicleTopSpeed( float speed ) {
+	return OpenQ4_TurboVehicleSpeedsActive() ? speed * OPENQ4_TURBO_VEHICLE_SPEED_SCALE : speed;
+}
+
 /***********************************************************************
 
 							rvVehiclePart
@@ -1981,19 +1989,21 @@ void rvVehicleHoverpad::RunPhysics ( void ) {
 
 		// Add forward/backward thrust
 		if ( thrustForward ) {
+			const float forwardThrust = OpenQ4_TurboVehicleTopSpeed( thrustForward );
 			if ( g_vehicleMode.GetInteger() == 2 ) {
-				impulseForce += ( position->mInputCmd.forwardmove / 127.0f ) * axis[0] * thrustForward * MS2SEC(gameLocal.msec) * parent->GetPhysics()->GetMass ();
+				impulseForce += ( position->mInputCmd.forwardmove / 127.0f ) * axis[0] * forwardThrust * MS2SEC(gameLocal.msec) * parent->GetPhysics()->GetMass ();
 			} else {
-				impulseForce += ( position->mInputCmd.forwardmove / 127.0f ) * parent->GetPhysics()->GetAxis()[0] * thrustForward * MS2SEC(gameLocal.msec) * parent->GetPhysics()->GetMass ();
+				impulseForce += ( position->mInputCmd.forwardmove / 127.0f ) * parent->GetPhysics()->GetAxis()[0] * forwardThrust * MS2SEC(gameLocal.msec) * parent->GetPhysics()->GetMass ();
 			}
 		}
  
 		// Add right/left thrust.  The front pads will add force to the right if the right button is pressed and the rear will do the opposite.  If moving backward the directions are flipped again
 		if ( thrustLeft ) {
+			const float leftThrust = OpenQ4_TurboVehicleTopSpeed( thrustLeft );
 			if ( !parent->IsStrafing() && g_vehicleMode.GetInteger() != 0 ) {
-				impulseForce += ( position->mInputCmd.rightmove / 127.0f ) * -axis[2] * thrustLeft * MS2SEC(gameLocal.msec) * parent->GetPhysics()->GetMass ();
+				impulseForce += ( position->mInputCmd.rightmove / 127.0f ) * -axis[2] * leftThrust * MS2SEC(gameLocal.msec) * parent->GetPhysics()->GetMass ();
 			} else {
-				impulseForce += ( position->mInputCmd.rightmove / 127.0f ) * (position->mInputCmd.forwardmove<0?-1:1) * parent->GetPhysics()->GetAxis()[1] * thrustLeft * MS2SEC(gameLocal.msec) * parent->GetPhysics()->GetMass () * (fl.front ? 1 : -1);
+				impulseForce += ( position->mInputCmd.rightmove / 127.0f ) * (position->mInputCmd.forwardmove<0?-1:1) * parent->GetPhysics()->GetAxis()[1] * leftThrust * MS2SEC(gameLocal.msec) * parent->GetPhysics()->GetMass () * (fl.front ? 1 : -1);
 			}
 		}
 	}
@@ -2230,7 +2240,7 @@ void rvVehicleThruster::RunPhysics ( void ) {
 	UpdateOrigin ( );
 	
 	// Apply the force
-	parent->GetPhysics()->ApplyImpulse ( 0, worldOrigin, worldAxis[forceAxis] * force * mult );
+	parent->GetPhysics()->ApplyImpulse ( 0, worldOrigin, worldAxis[forceAxis] * OpenQ4_TurboVehicleTopSpeed( force ) * mult );
 	
 	// Debug Information
 	if ( g_debugVehicle.GetInteger() == 2 ) {

@@ -5,6 +5,10 @@
 #include "Game_local.h"
 #include "Projectile.h"
 
+static float OpenQ4_TurboVehicleTopSpeed( float speed ) {
+	return ( g_turboMode.GetBool() && !gameLocal.isMultiplayer ) ? speed * OPENQ4_TURBO_VEHICLE_SPEED_SCALE : speed;
+}
+
 /*
 ===============================================================================
 
@@ -2305,7 +2309,7 @@ void idAFEntity_VehicleFourWheels::Think( void ) {
 
 		if ( player ) {
 			// capture the input from a player
-			velocity = g_vehicleVelocity.GetFloat();
+			velocity = OpenQ4_TurboVehicleTopSpeed( g_vehicleVelocity.GetFloat() );
 			if ( player->usercmd.forwardmove < 0 ) {
 				velocity = -velocity;
 			}
@@ -2480,7 +2484,7 @@ void idAFEntity_VehicleSixWheels::Think( void ) {
 
 		if ( player ) {
 			// capture the input from a player
-			velocity = g_vehicleVelocity.GetFloat();
+			velocity = OpenQ4_TurboVehicleTopSpeed( g_vehicleVelocity.GetFloat() );
 			if ( player->usercmd.forwardmove < 0 ) {
 				velocity = -velocity;
 			}

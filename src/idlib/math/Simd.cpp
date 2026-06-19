@@ -3,7 +3,7 @@
 #pragma hdrstop
 
 #include "Simd_generic.h"
-#ifdef _WINDOWS
+#if defined( _WINDOWS ) && !defined( _M_X64 ) && !defined( __x86_64__ )
 #include "Simd_MMX.h"
 #include "Simd_3DNow.h"
 #include "Simd_SSE.h"
@@ -80,7 +80,7 @@ void idSIMD::InitProcessor( const char *module, bool forceGeneric ) {
 				assert( false );
 				processor = generic;
 #endif
-#ifdef _WINDOWS
+#if defined( _WINDOWS ) && !defined( _M_X64 ) && !defined( __x86_64__ )
 			} else if ( ( cpuid & CPUID_MMX ) && ( cpuid & CPUID_SSE ) && ( cpuid & CPUID_SSE2 ) && ( cpuid & CPUID_SSE3 ) ) {
 				processor = new idSIMD_SSE3;
 			} else if ( ( cpuid & CPUID_MMX ) && ( cpuid & CPUID_SSE ) && ( cpuid & CPUID_SSE2 ) ) {
@@ -156,29 +156,21 @@ long baseClocks = 0;
 
 #ifdef _WINDOWS
 
-#define TIME_TYPE int
-
-#pragma warning(disable : 4731)     // frame pointer register 'ebx' modified by inline assembly code
-
-long saved_ebx = 0;
+#define TIME_TYPE double
 
 #define StartRecordTime( start )			\
-	__asm mov saved_ebx, ebx				\
-	__asm xor eax, eax						\
-	__asm cpuid								\
-	__asm rdtsc								\
-	__asm mov start, eax					\
-	__asm xor eax, eax						\
-	__asm cpuid
+	{										\
+		LARGE_INTEGER li;					\
+		QueryPerformanceCounter( &li );		\
+		start = (double) li.QuadPart;		\
+	}
 
 #define StopRecordTime( end )				\
-	__asm xor eax, eax						\
-	__asm cpuid								\
-	__asm rdtsc								\
-	__asm mov end, eax						\
-	__asm mov ebx, saved_ebx				\
-	__asm xor eax, eax						\
-	__asm cpuid
+	{										\
+		LARGE_INTEGER li;					\
+		QueryPerformanceCounter( &li );		\
+		end = (double) li.QuadPart;			\
+	}
 
 #elif defined(MACOS_X)
 
@@ -4232,7 +4224,7 @@ void idSIMD::Test_f( const idCmdArgs &args ) {
 
 		argString.Replace( " ", "" );
 
-#ifdef _WINDOWS
+#if defined( _WINDOWS ) && !defined( _M_X64 ) && !defined( __x86_64__ )
 		if ( idStr::Icmp( argString, "MMX" ) == 0 ) {
 			if ( !( cpuid & CPUID_MMX ) ) {
 				common->Printf( "CPU does not support MMX\n" );

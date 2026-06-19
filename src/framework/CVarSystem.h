@@ -350,7 +350,7 @@ ID_INLINE void idCVar::Init( const char *name, const char *value, int flags, con
 	this->integerValue = 0;
 	this->floatValue = 0.0f;
 	this->internalVar = this;
-	if ( staticVars != (idCVar *)0xFFFFFFFF ) {
+	if ( staticVars != (idCVar *)-1 ) {
 		this->next = staticVars;
 		staticVars = this;
 	} else {
@@ -363,11 +363,11 @@ ID_INLINE void idCVar::RegisterStaticVars( void ) {
 // jnewquist: Tag scope and callees to track allocations using "new".
 	MEM_SCOPED_TAG(tag,MA_CVAR);
 // RAVEN END
-	if ( staticVars != (idCVar *)0xFFFFFFFF ) {
+	if ( staticVars != (idCVar *)-1 ) {
 		for ( idCVar *cvar = staticVars; cvar; cvar = cvar->next ) {
 			cvarSystem->Register( cvar );
 		}
-		staticVars = (idCVar *)0xFFFFFFFF;
+		staticVars = (idCVar *)-1;
 	}
 }
 
@@ -385,7 +385,7 @@ ID_INLINE idCVarHelp::idCVarHelp( const char *cvarName, const char *friendlyName
 	this->category = category;
 	this->next = NULL;
 
-	if ( staticCVarHelps != (idCVarHelp *)0xFFFFFFFF ) {
+	if ( staticCVarHelps != (idCVarHelp *)-1 ) {
 		if ( !staticCVarHelpsTail ) {
 			staticCVarHelps = this;
 		} else {
@@ -403,11 +403,11 @@ ID_INLINE void idCVarHelp::RegisterStatics( void ) {
 // jnewquist: Tag scope and callees to track allocations using "new".
 	MEM_SCOPED_TAG(tag,MA_CVAR);
 // RAVEN END
-	if ( staticCVarHelps != (idCVarHelp *)0xFFFFFFFF ) {
+	if ( staticCVarHelps != (idCVarHelp *)-1 ) {
 		for ( const idCVarHelp *cvarHelp = staticCVarHelps; cvarHelp; cvarHelp = cvarHelp->next ) {
 			cvarSystem->Register( cvarHelp );
 		}
-		staticCVarHelps = (idCVarHelp *)0xFFFFFFFF;
+		staticCVarHelps = (idCVarHelp *)-1;
 	}
 }
 // RAVEN END

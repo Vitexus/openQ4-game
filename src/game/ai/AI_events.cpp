@@ -1126,6 +1126,9 @@ void idAI::Event_PostSpawn( void ) {
 
 		//buddies are a little more healthy on hard & nightmare since the baddies deal so much more damage
 		switch ( g_skill.GetInteger() ) {
+		case 4:
+			health *= 1.6f;
+			break;
 		case 3:
 			health *= 1.4f;
 			break;

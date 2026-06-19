@@ -2,6 +2,7 @@
 #ifndef __SYS_PUBLIC__
 #define __SYS_PUBLIC__
 
+#include <stdint.h>
 
 /*
 ===============================================================================
@@ -13,17 +14,28 @@
 
 
 // Win32
-#ifdef _WINDOWS 
+#if defined(WIN32) || defined(_WIN32) || defined(_WINDOWS)
 
-#define	BUILD_STRING					"win-x86"
 #define BUILD_OS_ID						0
-#define	CPUSTRING						"x86"
+#if defined( _M_X64 ) || defined( __x86_64__ )
+	#define	BUILD_STRING				"win-x64"
+	#define	CPUSTRING					"x64"
+#elif defined( _M_IX86 ) || defined( __i386__ )
+	#define	BUILD_STRING				"win-x86"
+	#define	CPUSTRING					"x86"
+#elif defined( _M_ARM64 ) || defined( __aarch64__ )
+	#define	BUILD_STRING				"win-arm64"
+	#define	CPUSTRING					"arm64"
+#else
+	#define	BUILD_STRING				"win-unknown"
+	#define	CPUSTRING					"unknown"
+#endif
 #define CPU_EASYARGS					1
 
 #define ALIGN16( x )					__declspec(align(16)) x
 #define PACKED
 
-#define _alloca16( x )					((void *)((((int)_alloca( (x)+15 )) + 15) & ~15))
+#define _alloca16( x )					((void *)((((intptr_t)_alloca( (x)+15 )) + 15) & ~(intptr_t)15))
 
 #define ID_INLINE						__forceinline
 #define ID_STATIC_TEMPLATE				static
@@ -55,6 +67,12 @@
 #elif defined(__i386__)
 	#define	CPUSTRING					"x86"
 	#define CPU_EASYARGS				1
+#elif defined(__x86_64__)
+	#define	CPUSTRING					"x64"
+	#define CPU_EASYARGS				1
+#elif defined(__aarch64__) || defined(__arm64__)
+	#define	CPUSTRING					"arm64"
+	#define CPU_EASYARGS				1
 #endif
 
 #define ALIGN16( x )					x __attribute__ ((aligned (16))) 
@@ -65,7 +83,7 @@
 #endif
 
 #define _alloca							alloca
-#define _alloca16( x )					((void *)((((int)alloca( (x)+15 )) + 15) & ~15))
+#define _alloca16( x )					((void *)((((intptr_t)alloca( (x)+15 )) + 15) & ~(intptr_t)15))
 
 #define __cdecl
 #define ASSERT							assert
@@ -87,12 +105,23 @@
 	#define CPU_EASYARGS				1
 #elif defined(__ppc__)
 	#define	BUILD_STRING				"linux-ppc"
+	#define BUILD_OS_ID					2
 	#define CPUSTRING					"ppc"
 	#define CPU_EASYARGS				0
+#elif defined(__x86_64__)
+	#define	BUILD_STRING				"linux-x64"
+	#define BUILD_OS_ID					2
+	#define CPUSTRING					"x64"
+	#define CPU_EASYARGS				1
+#elif defined(__aarch64__) || defined(__arm64__)
+	#define	BUILD_STRING				"linux-arm64"
+	#define BUILD_OS_ID					2
+	#define CPUSTRING					"arm64"
+	#define CPU_EASYARGS				1
 #endif
 
 #define _alloca							alloca
-#define _alloca16( x )					((void *)((((int)alloca( (x)+15 )) + 15) & ~15))
+#define _alloca16( x )					((void *)((((intptr_t)alloca( (x)+15 )) + 15) & ~(intptr_t)15))
 
 #define ALIGN16( x )					x
 #define PACKED							__attribute__((packed))
@@ -242,7 +271,7 @@ typedef struct sysMemoryStats_s {
 	int availExtendedVirtual;
 } sysMemoryStats_t;
 
-typedef unsigned long address_t;
+typedef uintptr_t address_t;
 
 template<class type> class idList;		// for Sys_ListFiles
 
@@ -352,9 +381,9 @@ void			Sys_ShutdownSymbols( void );
 
 #ifdef _LOAD_DLL
 // DLL loading, the path should be a fully qualified OS path to the DLL file to be loaded
-int				Sys_DLL_Load( const char *dllName );
-void *			Sys_DLL_GetProcAddress( int dllHandle, const char *procName );
-void			Sys_DLL_Unload( int dllHandle );
+intptr_t		Sys_DLL_Load( const char *dllName );
+void *			Sys_DLL_GetProcAddress( intptr_t dllHandle, const char *procName );
+void			Sys_DLL_Unload( intptr_t dllHandle );
 #endif // _LOAD_DLL
 
 // event generation
@@ -673,7 +702,7 @@ typedef enum {
 
 typedef struct {
 	const char *	name;
-	int				threadHandle;
+	uintptr_t		threadHandle;
 	unsigned long	threadId;
 // RAVEN BEGIN
 // ksergent: included to track multiprocessor system
@@ -752,9 +781,9 @@ public:
 	virtual const char *	GetCallStackCurStr( int depth ) = 0;
 	virtual void			ShutdownSymbols( void ) = 0;
 
-	virtual int				DLL_Load( const char *dllName ) = 0;
-	virtual void *			DLL_GetProcAddress( int dllHandle, const char *procName ) = 0;
-	virtual void			DLL_Unload( int dllHandle ) = 0;
+	virtual intptr_t		DLL_Load( const char *dllName ) = 0;
+	virtual void *			DLL_GetProcAddress( intptr_t dllHandle, const char *procName ) = 0;
+	virtual void			DLL_Unload( intptr_t dllHandle ) = 0;
 	virtual void			DLL_GetFileName( const char *baseName, char *dllName, int maxLength ) = 0;
 
 	virtual sysEvent_t		GenerateMouseButtonEvent( int button, bool down ) = 0;

@@ -4069,6 +4069,7 @@ idUserInterface* idMultiplayerGame::StartMenu( void ) {
 		mainGui->SetStateBool( "player_model_updated", true );
 
 		ResolveAndApplyMPMenuModelSelection( mainGui, buildValues, isTeamGame, menuModelTeam, def );
+		mainGui->StateChanged( gameLocal.time );
 
 		idPlayer *nameSourcePlayer = gameLocal.GetLocalPlayer();
 		if ( nameSourcePlayer && nameSourcePlayer->GetUserInfo() ) {
@@ -7608,6 +7609,7 @@ void idMultiplayerGame::UpdateMPSettingsModel( idUserInterface* currentGui ) {
 	}
 
 	ResolveAndApplyMPMenuModelSelection( currentGui, buildValues, isTeamGame, menuModelTeam, def );
+	currentGui->StateChanged( gameLocal.realClientTime );
 }
 
 /*

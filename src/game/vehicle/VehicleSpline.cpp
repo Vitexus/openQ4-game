@@ -16,6 +16,10 @@ CLASS_DECLARATION( rvVehicle, rvVehicleSpline )
 	EVENT( EV_DoneMoving,	rvVehicleSpline::Event_DoneMoving )
 END_CLASS
 
+static float OpenQ4_TurboVehicleTopSpeed( float speed ) {
+	return ( g_turboMode.GetBool() && !gameLocal.isMultiplayer ) ? speed * OPENQ4_TURBO_VEHICLE_SPEED_SCALE : speed;
+}
+
 rvVehicleSpline::rvVehicleSpline ( void ) {
 }
 
@@ -92,7 +96,7 @@ void rvVehicleSpline::Think( void ) {
 		moveAmount = Sign( moveAmount );
 	}
 
-	physicsObj.SetSpeed( idealSpeed * moveAmount );
+	physicsObj.SetSpeed( OpenQ4_TurboVehicleTopSpeed( idealSpeed ) * moveAmount );
 
 	rvVehicle::Think( );
 }

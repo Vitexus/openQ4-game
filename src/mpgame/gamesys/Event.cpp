@@ -72,6 +72,10 @@ idEventDef::idEventDef( const char *command, const char *formatspec, char return
 			argsize += sizeof(intptr_t);
 			break;
 
+		case D_EVENT_INTEGER64bit :
+			argsize += sizeof(intptr_t);
+			break;
+
 		case D_EVENT_VECTOR :
 			argsize += E_EVENT_SIZEOF_VEC;
 			break;
@@ -194,6 +198,144 @@ bool idEvent::initialized = false;
 
 idDynamicBlockAlloc<byte, 16 * 1024, 256, MA_EVENT>	idEvent::eventDataAllocator;
 
+static const int EVENT_SAVE_FORMAT_TYPED = -2;
+
+static void idEvent_WriteIntPtr( idSaveGame *savefile, const intptr_t value ) {
+	const uint64_t bits = static_cast<uint64_t>( static_cast<int64_t>( value ) );
+	savefile->WriteInt( static_cast<int>( bits & 0xffffffffu ) );
+	savefile->WriteInt( static_cast<int>( ( bits >> 32 ) & 0xffffffffu ) );
+}
+
+static intptr_t idEvent_ReadIntPtr( idRestoreGame *savefile ) {
+	int low;
+	int high;
+
+	savefile->ReadInt( low );
+	savefile->ReadInt( high );
+
+	const uint64_t bits = static_cast<uint32_t>( low ) | ( static_cast<uint64_t>( static_cast<uint32_t>( high ) ) << 32 );
+	return static_cast<intptr_t>( static_cast<int64_t>( bits ) );
+}
+
+static void idEvent_StoreTraceMaterialName( byte *dataPtr ) {
+	trace_t *trace = reinterpret_cast<trace_t *>( dataPtr + sizeof( bool ) );
+	char *materialName = reinterpret_cast<char *>( dataPtr + sizeof( bool ) + sizeof( trace_t ) );
+
+	if ( trace->c.material ) {
+		idStr::Copynz( materialName, trace->c.material->GetName(), MAX_STRING_LEN );
+	} else {
+		materialName[0] = '\0';
+	}
+}
+
+static void idEvent_SaveTypedArgs( idSaveGame *savefile, const idEventDef *eventdef, byte *eventData ) {
+	const char *formatspec = eventdef->GetArgFormat();
+	const int numargs = eventdef->GetNumArgs();
+
+	for ( int i = 0; i < numargs; i++ ) {
+		const int offset = eventdef->GetArgOffset( i );
+		byte *dataPtr = eventData + offset;
+
+		switch( formatspec[ i ] ) {
+		case D_EVENT_FLOAT :
+			savefile->WriteFloat( *reinterpret_cast<float *>( dataPtr ) );
+			break;
+
+		case D_EVENT_INTEGER :
+			savefile->WriteInt( static_cast<int>( *reinterpret_cast<intptr_t *>( dataPtr ) ) );
+			break;
+
+		case D_EVENT_INTEGER64bit :
+			idEvent_WriteIntPtr( savefile, *reinterpret_cast<intptr_t *>( dataPtr ) );
+			break;
+
+		case D_EVENT_VECTOR :
+			savefile->WriteVec3( *reinterpret_cast<idVec3 *>( dataPtr ) );
+			break;
+
+		case D_EVENT_STRING :
+			savefile->WriteString( reinterpret_cast<const char *>( dataPtr ) );
+			break;
+
+		case D_EVENT_ENTITY :
+		case D_EVENT_ENTITY_NULL :
+			reinterpret_cast< idEntityPtr<idEntity> * >( dataPtr )->Save( savefile );
+			break;
+
+		case D_EVENT_TRACE : {
+			const bool hasTrace = *reinterpret_cast<bool *>( dataPtr );
+			savefile->WriteBool( hasTrace );
+			if ( hasTrace ) {
+				savefile->WriteTrace( *reinterpret_cast<trace_t *>( dataPtr + sizeof( bool ) ) );
+			}
+			break;
+		}
+
+		default :
+			gameLocal.Error( "idEvent::Save : Invalid arg format '%s' string for '%s' event.", formatspec, eventdef->GetName() );
+			break;
+		}
+	}
+}
+
+static void idEvent_RestoreTypedArgs( idRestoreGame *savefile, const idEventDef *eventdef, byte *eventData ) {
+	const char *formatspec = eventdef->GetArgFormat();
+	const int numargs = eventdef->GetNumArgs();
+
+	for ( int i = 0; i < numargs; i++ ) {
+		const int offset = eventdef->GetArgOffset( i );
+		byte *dataPtr = eventData + offset;
+
+		switch( formatspec[ i ] ) {
+		case D_EVENT_FLOAT :
+			savefile->ReadFloat( *reinterpret_cast<float *>( dataPtr ) );
+			break;
+
+		case D_EVENT_INTEGER : {
+			int value;
+			savefile->ReadInt( value );
+			*reinterpret_cast<intptr_t *>( dataPtr ) = value;
+			break;
+		}
+
+		case D_EVENT_INTEGER64bit :
+			*reinterpret_cast<intptr_t *>( dataPtr ) = idEvent_ReadIntPtr( savefile );
+			break;
+
+		case D_EVENT_VECTOR :
+			savefile->ReadVec3( *reinterpret_cast<idVec3 *>( dataPtr ) );
+			break;
+
+		case D_EVENT_STRING : {
+			idStr string;
+			savefile->ReadString( string );
+			idStr::Copynz( reinterpret_cast<char *>( dataPtr ), string.c_str(), MAX_STRING_LEN );
+			break;
+		}
+
+		case D_EVENT_ENTITY :
+		case D_EVENT_ENTITY_NULL :
+			reinterpret_cast< idEntityPtr<idEntity> * >( dataPtr )->Restore( savefile );
+			break;
+
+		case D_EVENT_TRACE : {
+			bool hasTrace;
+			savefile->ReadBool( hasTrace );
+			*reinterpret_cast<bool *>( dataPtr ) = hasTrace;
+			if ( hasTrace ) {
+				savefile->ReadTrace( *reinterpret_cast<trace_t *>( dataPtr + sizeof( bool ) ) );
+				idEvent_StoreTraceMaterialName( dataPtr );
+			}
+			break;
+		}
+
+		default :
+			savefile->Error( "idEvent::Restore : Invalid arg format '%s' string for '%s' event.", formatspec, eventdef->GetName() );
+			break;
+		}
+	}
+}
+
 /*
 ================
 idEvent::~idEvent()
@@ -285,8 +427,12 @@ idEvent *idEvent::Alloc( const idEventDef *evdef, int numargs, va_list args ) {
 
 		switch( format[ i ] ) {
 		case D_EVENT_FLOAT :
+			*reinterpret_cast<int *>( dataPtr ) = static_cast<int>( arg->value );
+			break;
+
 		case D_EVENT_INTEGER :
-			*reinterpret_cast<int *>( dataPtr ) = arg->value;
+		case D_EVENT_INTEGER64bit :
+			*reinterpret_cast<intptr_t *>( dataPtr ) = arg->value;
 			break;
 
 		case D_EVENT_VECTOR :
@@ -546,8 +692,12 @@ void idEvent::ServiceEvents( void ) {
 			data = event->data;
 			switch( formatspec[ i ] ) {
 			case D_EVENT_FLOAT :
-			case D_EVENT_INTEGER :
 				args[ i ] = *reinterpret_cast<int *>( &data[ offset ] );
+				break;
+
+			case D_EVENT_INTEGER :
+			case D_EVENT_INTEGER64bit :
+				args[ i ] = *reinterpret_cast<intptr_t *>( &data[ offset ] );
 				break;
 
 			case D_EVENT_VECTOR :
@@ -691,8 +841,8 @@ void idEvent::Save( idSaveGame *savefile ) {
 		savefile->WriteString( event->eventdef->GetName() );
 		savefile->WriteString( event->typeinfo->classname );
 		savefile->WriteObject( event->object );
-		savefile->WriteInt( event->eventdef->GetArgSize() );
-		savefile->Write( event->data, event->eventdef->GetArgSize() );
+		savefile->WriteInt( EVENT_SAVE_FORMAT_TYPED );
+		idEvent_SaveTypedArgs( savefile, event->eventdef, event->data );
 
 		event = event->eventNode.Next();
 	}
@@ -742,6 +892,17 @@ void idEvent::Restore( idRestoreGame *savefile ) {
 
 		// read the args
 		savefile->ReadInt( argsize );
+		if ( argsize == EVENT_SAVE_FORMAT_TYPED ) {
+			const size_t eventArgSize = event->eventdef->GetArgSize();
+			if ( eventArgSize ) {
+				event->data = eventDataAllocator.Alloc( eventArgSize );
+				memset( event->data, 0, eventArgSize );
+				idEvent_RestoreTypedArgs( savefile, event->eventdef, event->data );
+			} else {
+				event->data = NULL;
+			}
+			continue;
+		}
 		if ( argsize != event->eventdef->GetArgSize() ) {
 			savefile->Error( "idEvent::Restore: arg size (%d) doesn't match saved arg size(%d) on event '%s'", event->eventdef->GetArgSize(), argsize, event->eventdef->GetName() );
 		}

@@ -9524,7 +9524,13 @@ void idPlayer::AdjustSpeed( void ) {
 		speed *= 0.33f;
 	}
 
-	physicsObj.SetSpeed( speed, pm_crouchspeed.GetFloat() );
+	float crouchSpeed = pm_crouchspeed.GetFloat();
+	if ( g_turboMode.GetBool() && !gameLocal.isMultiplayer ) {
+		speed *= OPENQ4_TURBO_MOVE_SCALE;
+		crouchSpeed *= OPENQ4_TURBO_MOVE_SCALE;
+	}
+
+	physicsObj.SetSpeed( speed, crouchSpeed );
 }
 
 /*
@@ -11346,6 +11352,9 @@ void idPlayer::CalcDamagePoints( idEntity *inflictor, idEntity *attacker, const 
 					break;
 				case 3:
  					damage *= 3.5f;
+					break;
+				case 4:
+					damage *= 5.0f;
 					break;
 				default:
 					//damage *= 1.1f;  reverted to 1.0 for default damage... as per Biessman's request.

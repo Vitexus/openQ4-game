@@ -20,7 +20,7 @@ This repository is the canonical home for SDK/game-library source used by the op
 Meson/Ninja is the primary and only supported build workflow in this repository.
 
 Requirements:
-- Visual Studio C++ toolchain (`cl.exe`) in an **x86 Native Tools** environment
+- Visual Studio C++ toolchain (`cl.exe`); the wrapper selects an x64 target by default on x64 hosts
 - Meson and Ninja
 
 1. Configure:
@@ -28,7 +28,9 @@ Requirements:
 2. Build:
    `powershell -ExecutionPolicy Bypass -File tools/build/meson_setup.ps1 compile -C builddir`
 3. Outputs:
-   `builddir/src/game-sp_x86.dll` and `builddir/src/game-mp_x86.dll`
+   `builddir/src/game-sp_x64.dll` and `builddir/src/game-mp_x64.dll` on x64 hosts
+
+The x64 build uses the generic SIMD implementation; the legacy MMX/3DNow/SSE source files are x86 inline-assembly backends and are excluded from x64 builds.
 
 From openQ4, you can invoke this same flow with:
 `powershell -ExecutionPolicy Bypass -File tools/build/build_gamelibs.ps1`

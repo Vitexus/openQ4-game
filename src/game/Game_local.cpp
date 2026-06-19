@@ -6202,7 +6202,7 @@ bool idGameLocal::InhibitEntitySpawn( idDict &spawnArgs ) {
 
 	const char *name;
 #ifndef ID_DEMO_BUILD
-	if ( g_skill.GetInteger() == 3 ) { 
+	if ( g_skill.GetInteger() >= 3 ) { 
 		name = spawnArgs.GetString( "classname" );
 		if ( idStr::Icmp( name, "item_medkit" ) == 0 || idStr::Icmp( name, "item_medkit_small" ) == 0 ) {
 			result = true;
@@ -6258,8 +6258,8 @@ void idGameLocal::SetSkill( int value ) {
 
 	if ( value < 0 ) {
 		skill_level = 0;
-	} else if ( value > 3 ) {
-		skill_level = 3;
+	} else if ( value > MAX_SKILL_LEVELS - 1 ) {
+		skill_level = MAX_SKILL_LEVELS - 1;
 	} else {
 		skill_level = value;
 	}
@@ -7576,9 +7576,14 @@ idGameLocal::SpawnClientMoveable
 ======================
 */
 void idGameLocal::SpawnClientMoveable( const char* name, int lifetime, const idVec3& origin, const idMat3& axis, const idVec3& velocity, const idVec3& angular_velocity ) {
+	const bool debugDebris = cvarSystem && cvarSystem->GetCVarInteger( "bse_debug" ) > 0;
+
 	// find the debris def
 	const idDict* args = gameLocal.FindEntityDefDict( name, false );
 	if ( !args ) {
+		if ( debugDebris ) {
+			common->Warning( "BSE debris: entityDef '%s' not found", name ? name : "" );
+		}
 		return;
 	}
 
@@ -7595,7 +7600,14 @@ void idGameLocal::SpawnClientMoveable( const char* name, int lifetime, const idV
 	SpawnClientEntityDef( *args, (rvClientEntity**)(&cent), false, "rvClientMoveable" );
 	
 	if( !cent ) {
+		if ( debugDebris ) {
+			common->Warning( "BSE debris: failed to spawn client moveable '%s'", name ? name : "" );
+		}
 		return;
+	}
+
+	if ( debugDebris ) {
+		common->Printf( "BSE debris: spawned client moveable '%s' lifetime=%d\n", name ? name : "", lifetime );
 	}
  
 	cent->SetOrigin( origin );

@@ -20,6 +20,7 @@ extern idCVar	g_monsters;
 extern idCVar	g_decals;
 extern idCVar	g_knockback;
 extern idCVar	g_skill;
+extern idCVar	g_turboMode;
 extern idCVar	g_gravity;
 extern idCVar	g_mp_gravity;
 extern idCVar	g_skipFX;

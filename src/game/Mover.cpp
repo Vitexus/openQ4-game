@@ -16,6 +16,29 @@ static const char *guiBinaryMoverStates[] = {
 	"4"		// moving 2 to 1
 };
 
+static const float OPENQ4_TURBO_MOVER_SPEED_SCALE = 2.0f;
+
+static bool OpenQ4_TurboMoversActive( void ) {
+	return g_turboMode.GetBool() && !gameLocal.isMultiplayer;
+}
+
+static float OpenQ4_TurboMoverSpeed( float speed ) {
+	return OpenQ4_TurboMoversActive() ? speed * OPENQ4_TURBO_MOVER_SPEED_SCALE : speed;
+}
+
+static float OpenQ4_TurboMoverSeconds( float seconds ) {
+	return OpenQ4_TurboMoversActive() ? seconds / OPENQ4_TURBO_MOVER_SPEED_SCALE : seconds;
+}
+
+static int OpenQ4_TurboMoverMilliseconds( int milliseconds ) {
+	if ( !OpenQ4_TurboMoversActive() || milliseconds <= 1 ) {
+		return milliseconds;
+	}
+
+	const int scaled = idPhysics::SnapTimeToPhysicsFrame( milliseconds / OPENQ4_TURBO_MOVER_SPEED_SCALE );
+	return scaled > 0 ? scaled : 1;
+}
+
 
 /*
 ===============================================================================
@@ -363,6 +386,10 @@ void idMover::Spawn( void ) {
 	deceltime		= 1000.0f * spawnArgs.GetFloat( "decel_time", "0" );
 	move_time		= 1000.0f * spawnArgs.GetFloat( "move_time", "1" );	// safe default value
 	move_speed		= spawnArgs.GetFloat( "move_speed", "0" );
+	acceltime		= OpenQ4_TurboMoverMilliseconds( acceltime );
+	deceltime		= OpenQ4_TurboMoverMilliseconds( deceltime );
+	move_time		= OpenQ4_TurboMoverMilliseconds( move_time );
+	move_speed		= OpenQ4_TurboMoverSpeed( move_speed );
 
 	spawnArgs.GetFloat( "damage" , "0", damage );
 
@@ -1237,7 +1264,7 @@ void idMover::Event_SetMoveSpeed( float speed ) {
 		gameLocal.Error( "Cannot set speed less than or equal to 0." );
 	}
 
-	move_speed = speed;
+	move_speed = OpenQ4_TurboMoverSpeed( speed );
 	move_time = 0;			// move_time is calculated for each move when move_speed is non-0
 }
 
@@ -1252,7 +1279,7 @@ void idMover::Event_SetMoveTime( float time ) {
 	}
 
 	move_speed = 0;
-	move_time = SEC2MS( time );
+	move_time = OpenQ4_TurboMoverMilliseconds( SEC2MS( time ) );
 }
 
 /*
@@ -1265,7 +1292,7 @@ void idMover::Event_SetAccellerationTime( float time ) {
 		gameLocal.Error( "Cannot set acceleration time less than 0." );
 	}
 
-	acceltime = SEC2MS( time );
+	acceltime = OpenQ4_TurboMoverMilliseconds( SEC2MS( time ) );
 }
 
 /*
@@ -1278,7 +1305,7 @@ void idMover::Event_SetDecelerationTime( float time ) {
 		gameLocal.Error( "Cannot set deceleration time less than 0." );
 	}
 
-	deceltime = SEC2MS( time );
+	deceltime = OpenQ4_TurboMoverMilliseconds( SEC2MS( time ) );
 }
 
 /*
@@ -1350,6 +1377,7 @@ void idMover::Event_MoveAccelerateTo( float speed, float time ) {
 
 	dir = physicsObj.GetLinearVelocity();
 	v = dir.Normalize();
+	speed = OpenQ4_TurboMoverSpeed( speed );
 
 	// if not moving already
 	if ( v == 0.0f ) {
@@ -1361,7 +1389,7 @@ void idMover::Event_MoveAccelerateTo( float speed, float time ) {
 		return;
 	}
 
-	at = idPhysics::SnapTimeToPhysicsFrame( SEC2MS( time ) );
+	at = OpenQ4_TurboMoverMilliseconds( SEC2MS( time ) );
 
 	lastCommand	= MOVER_MOVING;
 
@@ -1393,6 +1421,7 @@ void idMover::Event_MoveDecelerateTo( float speed, float time ) {
 
 	dir = physicsObj.GetLinearVelocity();
 	v = dir.Normalize();
+	speed = OpenQ4_TurboMoverSpeed( speed );
 
 	// if not moving already
 	if ( v == 0.0f ) {
@@ -1404,7 +1433,7 @@ void idMover::Event_MoveDecelerateTo( float speed, float time ) {
 		return;
 	}
 
-	dt = idPhysics::SnapTimeToPhysicsFrame( SEC2MS( time ) );
+	dt = OpenQ4_TurboMoverMilliseconds( SEC2MS( time ) );
 
 	lastCommand	= MOVER_MOVING;
 
@@ -1518,6 +1547,7 @@ idMover::Event_Bob
 void idMover::Event_Bob( float speed, float phase, idVec3 &depth ) {
 	idVec3 org;
 
+	speed = OpenQ4_TurboMoverSeconds( speed );
 	physicsObj.GetLocalOrigin( org );
 	physicsObj.SetLinearExtrapolation( extrapolation_t(EXTRAPOLATION_DECELSINE|EXTRAPOLATION_NOSTOP), speed * 1000 * phase, speed * 500, org, depth * 2.0f, vec3_origin );
 }
@@ -1532,6 +1562,7 @@ void idMover::Event_Sway( float speed, float phase, idAngles &depth ) {
 	float duration;
 
 	physicsObj.GetLocalAngles( ang );
+	speed = OpenQ4_TurboMoverSpeed( speed );
 	assert ( speed > 0.0f );
 	duration = idMath::Sqrt( depth[0] * depth[0] + depth[1] * depth[1] + depth[2] * depth[2] ) / speed;
 	angSpeed = depth / ( duration * idMath::SQRT_1OVER2 );
@@ -3870,10 +3901,10 @@ void idMover_Binary::InitSpeed( idVec3 &mpos1, idVec3 &mpos2, float mspeed, floa
 	pos1		= mpos1;
 	pos2		= mpos2;
 
-	accelTime	= idPhysics::SnapTimeToPhysicsFrame( SEC2MS( maccelTime ) );
-	decelTime	= idPhysics::SnapTimeToPhysicsFrame( SEC2MS( mdecelTime ) );
+	accelTime	= idPhysics::SnapTimeToPhysicsFrame( SEC2MS( OpenQ4_TurboMoverSeconds( maccelTime ) ) );
+	decelTime	= idPhysics::SnapTimeToPhysicsFrame( SEC2MS( OpenQ4_TurboMoverSeconds( mdecelTime ) ) );
 
-	speed		= mspeed ? mspeed : 100;
+	speed		= OpenQ4_TurboMoverSpeed( mspeed ? mspeed : 100 );
 
 	// calculate time to reach second position from speed
 	move = pos2 - pos1;
@@ -3904,10 +3935,10 @@ void idMover_Binary::InitTime( idVec3 &mpos1, idVec3 &mpos2, float mtime, float 
 	pos1		= mpos1;
 	pos2		= mpos2;
 
-	accelTime	= idPhysics::SnapTimeToPhysicsFrame( SEC2MS( maccelTime ) );
-	decelTime	= idPhysics::SnapTimeToPhysicsFrame( SEC2MS( mdecelTime ) );
+	accelTime	= idPhysics::SnapTimeToPhysicsFrame( SEC2MS( OpenQ4_TurboMoverSeconds( maccelTime ) ) );
+	decelTime	= idPhysics::SnapTimeToPhysicsFrame( SEC2MS( OpenQ4_TurboMoverSeconds( mdecelTime ) ) );
 
-	duration	= idPhysics::SnapTimeToPhysicsFrame( SEC2MS( mtime ) );
+	duration	= idPhysics::SnapTimeToPhysicsFrame( SEC2MS( OpenQ4_TurboMoverSeconds( mtime ) ) );
 	if ( duration <= 0 ) {
 		duration = 1;
 	}
@@ -5649,6 +5680,7 @@ void idRotater::Event_Activate( idEntity *activator ) {
 	if ( !spawnArgs.GetBool( "rotate" ) ) {
 		spawnArgs.Set( "rotate", "1" );
 		spawnArgs.GetFloat( "speed", "100", speed );
+		speed = OpenQ4_TurboMoverSpeed( speed );
 		spawnArgs.GetBool( "x_axis", "0", x_axis );
 		spawnArgs.GetBool( "y_axis", "0", y_axis );
 		
@@ -5705,6 +5737,8 @@ void idBobber::Spawn( void ) {
 	spawnArgs.GetFloat( "phase", "0", phase );
 	spawnArgs.GetBool( "x_axis", "0", x_axis );
 	spawnArgs.GetBool( "y_axis", "0", y_axis );
+	speed = OpenQ4_TurboMoverSeconds( speed );
+	phase = OpenQ4_TurboMoverSeconds( phase );
 
 	// set the axis of bobbing
 	delta = vec3_origin;
@@ -5787,6 +5821,8 @@ void idPendulum::Spawn( void ) {
 			freq = 1 / ( idMath::TWO_PI ) * idMath::Sqrt( g_gravity.GetFloat() / ( 3 * length ) );
 		}
 	}
+	freq = OpenQ4_TurboMoverSpeed( freq );
+	phase = OpenQ4_TurboMoverSeconds( phase );
 
 	physicsObj.SetSelf( this );
 // RAVEN BEGIN
@@ -5877,6 +5913,7 @@ void idRiser::Event_Activate( idEntity *activator ) {
 
 		spawnArgs.GetFloat( "time", "4", time );
 		spawnArgs.GetFloat( "height", "32", height );
+		time = OpenQ4_TurboMoverSeconds( time );
 
 		delta = vec3_origin;
 		delta[ 2 ] = height;
@@ -5913,6 +5950,7 @@ rvConveyor::Spawn
 */
 void rvConveyor::Spawn ( void ) {
 	spawnArgs.GetFloat ( "speed", "100", moveSpeed );
+	moveSpeed = OpenQ4_TurboMoverSpeed( moveSpeed );
 	
 	float angle;
 	if ( spawnArgs.GetFloat ( "moveAngle", "0", angle ) ) {
