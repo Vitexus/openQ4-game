@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="generic">
+  <id>cz.vitexsoftware.openq4-game</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>LicenseRef-Quake4-SDK-EULA</project_license>
+  <name>openQ4 Game Modules</name>
+  <summary>Quake 4 game libraries for the openQ4 engine</summary>
+  <description>
+    <p>
+      openQ4-GameLibs provides the single-player and multiplayer game library
+      modules derived from the Quake 4 SDK, maintained for compatibility with
+      the openQ4 open-source engine replacement.
+    </p>
+    <p>
+      These modules implement the game logic for Quake 4 and must be used
+      together with the openQ4 engine and original Quake 4 retail assets.
+    </p>
+  </description>
+  <icon type="stock">package-x-generic</icon>
+  <url type="homepage">https://github.com/themuffinator/openQ4-game</url>
+</component>

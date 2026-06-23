@@ -25,3 +25,10 @@ option(
   value : '',
   description : 'Optional legacy SDK include path relative to src/ (for example mssdk/include).',
 )
+
+option(
+  'install_root_override',
+  type : 'string',
+  value : '',
+  description : 'Override the root installation directory (for downstream packaging, e.g. /usr/lib/games/openq4).',
+)

@@ -1,0 +1,31 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: openQ4-GameLibs
+Upstream-Contact: DarkMatter Studios
+Source: https://github.com/themuffinator/openQ4-game
+
+Files: *
+Copyright: 2024-2026 DarkMatter Studios
+           id Software LLC (original Quake 4 SDK)
+License: Quake4-SDK-EULA
+
+Files: debian/*
+Copyright: 2026 Vítězslav Dvořák <vitex@vitexsoftware.com>
+License: GPL-3.0+
+
+License: Quake4-SDK-EULA
+ Licensed under the QUAKE 4 Software Development Kit Limited Use License
+ Agreement. Non-commercial distribution and use only unless separately
+ authorized by id Software in writing. Requires the full version of
+ QUAKE 4 to operate.
+ .
+ The full EULA text is included in this package at
+ /usr/share/doc/openq4-game/EULA.Development Kit.rtf.gz
+
+License: GPL-3.0+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ .
+ On Debian systems, the full text of the GPL v3 is in
+ /usr/share/common-licenses/GPL-3.

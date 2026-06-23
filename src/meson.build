@@ -5,10 +5,11 @@ host_system = host_machine.system()
 host_cpu_family = host_machine.cpu_family()
 is_windows = host_system == 'windows'
 is_darwin = host_system == 'darwin'
+is_linux = host_system == 'linux'
 is_msvc = cpp.get_id() == 'msvc'
 
-if not is_windows and not is_darwin
-  error('openQ4-GameLibs Meson build currently supports Windows/MSVC and macOS/Clang bring-up.')
+if not is_windows and not is_darwin and not is_linux
+  error('openQ4-GameLibs Meson build supports Windows/MSVC, macOS/Clang, and Linux/GCC+Clang.')
 endif
 
 if is_windows and not is_msvc
@@ -25,6 +26,10 @@ endif
 
 if is_darwin and not ['x86_64', 'aarch64'].contains(host_cpu_family)
   error('openQ4-GameLibs macOS builds currently support x64 and arm64 Clang toolchains.')
+endif
+
+if is_linux and not ['x86_64', 'aarch64'].contains(host_cpu_family)
+  error('openQ4-GameLibs Linux builds currently support x64 and arm64 toolchains.')
 endif
 
 if host_cpu_family == 'x86_64'
@@ -68,7 +73,7 @@ if is_msvc
   ]
 else
   if not cpp.has_argument('-std=c++17')
-    error('openQ4-GameLibs macOS builds require C++17 compiler support.')
+    error('openQ4-GameLibs non-MSVC builds require C++17 compiler support.')
   endif
   common_cpp_args += ['-std=c++17']
 
@@ -113,6 +118,8 @@ if is_windows
   ]
 elif is_darwin
   common_defines += ['MACOS_X=1']
+elif is_linux
+  common_defines += ['LINUX']
 endif
 
 if release_like
@@ -177,6 +184,9 @@ idlib = static_library(
   install : false,
 )
 
+_install_root_override = get_option('install_root_override')
+install_game_dir = _install_root_override != '' ? _install_root_override / 'baseoq4' : ''
+
 module_link_args = []
 if is_windows
   module_link_args = [
@@ -204,6 +214,17 @@ elif is_darwin
   foreach link_arg : [
     '-Wl,-dead_strip',
     '-Wl,-headerpad_max_install_names',
+  ]
+    if cpp.has_link_argument(link_arg)
+      module_link_args += link_arg
+    endif
+  endforeach
+elif is_linux
+  foreach link_arg : [
+    '-Wl,--as-needed',
+    '-Wl,-z,noexecstack',
+    '-Wl,-z,relro',
+    '-Wl,-z,now',
   ]
     if cpp.has_link_argument(link_arg)
       module_link_args += link_arg
@@ -253,6 +274,19 @@ if get_option('build_spgame')
       name_prefix : '',
       name_suffix : 'dylib',
       install : false,
+    )
+  elif is_linux
+    shared_module(
+      sp_module_name,
+      game_sources,
+      include_directories : source_inc,
+      link_with : idlib,
+      cpp_args : common_cpp_args + common_define_args + [game_dll_define_arg] + game_forced_include_args,
+      link_args : module_link_args,
+      name_prefix : '',
+      name_suffix : 'so',
+      install : install_game_dir != '',
+      install_dir : install_game_dir,
     )
   endif
 endif
@@ -306,6 +340,22 @@ if get_option('build_mpgame')
       name_suffix : 'dylib',
       install : false,
     )
+  elif is_linux
+    shared_module(
+      mp_module_name,
+      mpgame_sources,
+      include_directories : source_inc,
+      link_with : idlib,
+      cpp_args : common_cpp_args + common_define_args + [
+        game_dll_define_arg,
+        game_mpapi_define_arg,
+      ] + game_forced_include_args,
+      link_args : module_link_args,
+      name_prefix : '',
+      name_suffix : 'so',
+      install : install_game_dir != '',
+      install_dir : install_game_dir,
+    )
   endif
 endif
 
@@ -318,6 +368,7 @@ summary(
     'Build SP Game': get_option('build_spgame'),
     'Build MP Game': get_option('build_mpgame'),
     'Game Module Arch': game_arch,
+    'Install Dir': install_game_dir != '' ? install_game_dir : '(not installing)',
     'Inline Debug': inline_debug_enabled,
     'Legacy Include': mssdk_include == '' ? '(disabled)' : mssdk_include,
   },

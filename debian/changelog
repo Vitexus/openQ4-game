@@ -1,0 +1,6 @@
+openq4-game (0.0.1-1) unstable; urgency=low
+
+  * Initial Debian packaging.
+  * Add Linux (GCC/Clang) build support to standalone meson build.
+
+ -- Vítězslav Dvořák <vitex@vitexsoftware.com>  Mon, 23 Jun 2026 00:00:00 +0200

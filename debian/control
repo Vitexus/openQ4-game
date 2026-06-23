@@ -1,0 +1,28 @@
+Source: openq4-game
+Section: non-free/games
+Priority: optional
+Maintainer: Vítězslav Dvořák <vitex@vitexsoftware.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ meson (>= 1.2.0),
+ ninja-build,
+ python3,
+ appstream,
+Standards-Version: 4.6.2
+Homepage: https://github.com/themuffinator/openQ4-game
+Rules-Requires-Root: no
+
+Package: openq4-game
+Architecture: any
+Depends: openq4, ${shlibs:Depends}, ${misc:Depends}
+Description: Quake 4 game modules for the openQ4 engine
+ openQ4-GameLibs provides the single-player and multiplayer game library
+ modules derived from the Quake 4 SDK, maintained for use with the
+ openQ4 open-source engine replacement.
+ .
+ This package installs game-sp and game-mp shared modules into the
+ openQ4 engine directory.
+ .
+ Note: This software is licensed under the Quake 4 SDK Limited Use License
+ Agreement. Non-commercial use only unless separately authorized by
+ id Software. Requires a legitimate Quake 4 copy to operate.

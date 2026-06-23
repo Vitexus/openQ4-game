@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE = 1
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+
+GAMELIB_PATH = /usr/lib/games/openq4
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-Dinstall_root_override=$(GAMELIB_PATH) \
+		--wrap-mode=nofallback
+
+override_dh_auto_test:
+	appstreamcli validate --pedantic --no-net \
+		debian/openq4-game.metainfo.xml
